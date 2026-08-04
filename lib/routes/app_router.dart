@@ -14,6 +14,7 @@ import '../features/report/presentation/report_screen.dart';
 import '../features/salary/presentation/salary_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/water_purchase/presentation/water_purchase_screen.dart';
+import '../features/more/presentation/more_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
 CustomTransitionPage<void> _buildAnimatedPage({
@@ -24,18 +25,31 @@ CustomTransitionPage<void> _buildAnimatedPage({
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 300),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 250),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
         opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.03, 0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
-          child: child,
-        ),
+        child: child,
+      );
+    },
+  );
+}
+
+CustomTransitionPage<void> _buildFastShellPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 120),
+    reverseTransitionDuration: const Duration(milliseconds: 100),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
+        child: child,
       );
     },
   );
@@ -71,7 +85,7 @@ class AppRouter {
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const DashboardScreen(),
@@ -80,7 +94,7 @@ class AppRouter {
           GoRoute(
             path: '/customers',
             name: 'customers',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const CustomerScreen(),
@@ -89,7 +103,7 @@ class AppRouter {
           GoRoute(
             path: '/orders',
             name: 'orders',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const OrderScreen(),
@@ -98,7 +112,7 @@ class AppRouter {
           GoRoute(
             path: '/delivery',
             name: 'delivery',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const DeliveryScreen(),
@@ -107,7 +121,7 @@ class AppRouter {
           GoRoute(
             path: '/inventory',
             name: 'inventory',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const InventoryScreen(),
@@ -116,7 +130,7 @@ class AppRouter {
           GoRoute(
             path: '/water-purchase',
             name: 'waterPurchase',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const WaterPurchaseScreen(),
@@ -125,7 +139,7 @@ class AppRouter {
           GoRoute(
             path: '/employees',
             name: 'employees',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const EmployeeScreen(),
@@ -134,7 +148,7 @@ class AppRouter {
           GoRoute(
             path: '/salary',
             name: 'salary',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const SalaryScreen(),
@@ -143,7 +157,7 @@ class AppRouter {
           GoRoute(
             path: '/expenses',
             name: 'expenses',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const ExpenseScreen(),
@@ -152,7 +166,7 @@ class AppRouter {
           GoRoute(
             path: '/payments',
             name: 'payments',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const PaymentScreen(),
@@ -161,7 +175,7 @@ class AppRouter {
           GoRoute(
             path: '/reports',
             name: 'reports',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const ReportScreen(),
@@ -170,10 +184,19 @@ class AppRouter {
           GoRoute(
             path: '/settings',
             name: 'settings',
-            pageBuilder: (context, state) => _buildAnimatedPage(
+            pageBuilder: (context, state) => _buildFastShellPage(
               context: context,
               state: state,
               child: const SettingsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/more',
+            name: 'more',
+            pageBuilder: (context, state) => _buildFastShellPage(
+              context: context,
+              state: state,
+              child: const MoreScreen(),
             ),
           ),
         ],

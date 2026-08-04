@@ -62,39 +62,68 @@ class OrderModel {
         'notes': notes,
       };
 
-  factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
-        id: json['id'] ?? '',
-        customerId: json['customerId'] ?? '',
-        customerName: json['customerName'] ?? '',
-        phone: json['phone'] ?? '',
-        address: json['address'] ?? '',
-        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 35.0,
-        totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 35.0,
-        status: OrderStatus.values.firstWhere(
-          (e) => e.name == json['status'],
-          orElse: () => OrderStatus.pending,
-        ),
-        paymentStatus: PaymentStatus.values.firstWhere(
-          (e) => e.name == json['paymentStatus'],
-          orElse: () => PaymentStatus.pending,
-        ),
-        paymentMode: PaymentMode.values.firstWhere(
-          (e) => e.name == json['paymentMode'],
-          orElse: () => PaymentMode.cash,
-        ),
-        assignedDriverId: json['assignedDriverId'],
-        assignedDriverName: json['assignedDriverName'],
-        createdAt: json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'])
-            : DateTime.now(),
-        deliveredAt: json['deliveredAt'] != null
-            ? DateTime.parse(json['deliveredAt'])
-            : null,
-        emptyCansCollected: (json['emptyCansCollected'] as num?)?.toInt() ?? 0,
-        damagedCansReported: (json['damagedCansReported'] as num?)?.toInt() ?? 0,
-        notes: json['notes'] ?? '',
-      );
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] ?? json['DeliveryStatus'] ?? '').toString().toLowerCase();
+    final paymentStatusStr = (json['paymentStatus'] ?? json['PaymentStatus'] ?? '').toString().toLowerCase();
+    final paymentModeStr = (json['paymentMode'] ?? json['PaymentMode'] ?? '').toString().toLowerCase();
+
+    OrderStatus parsedStatus = OrderStatus.pending;
+    if (statusStr.contains('deliver')) {
+      parsedStatus = OrderStatus.delivered;
+    } else if (statusStr.contains('cancel')) {
+      parsedStatus = OrderStatus.cancelled;
+    } else if (statusStr.contains('transit') || statusStr.contains('out')) {
+      parsedStatus = OrderStatus.inTransit;
+    }
+
+    PaymentStatus parsedPaymentStatus = PaymentStatus.pending;
+    if (paymentStatusStr.contains('paid')) {
+      parsedPaymentStatus = PaymentStatus.paid;
+    }
+
+    PaymentMode parsedPaymentMode = PaymentMode.cash;
+    if (paymentModeStr.contains('upi')) {
+      parsedPaymentMode = PaymentMode.upi;
+    } else if (paymentModeStr.contains('bank') || paymentModeStr.contains('card')) {
+      parsedPaymentMode = PaymentMode.bankTransfer;
+    } else if (paymentModeStr.contains('credit')) {
+      parsedPaymentMode = PaymentMode.credit;
+    }
+
+    return OrderModel(
+      id: json['id'] ?? json['OrderID'] ?? '',
+      customerId: json['customerId'] ?? json['CustomerID'] ?? '',
+      customerName: json['customerName'] ?? json['CustomerName'] ?? '',
+      phone: json['phone'] ?? json['Phone'] ?? '',
+      address: json['address'] ?? json['Address'] ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? (json['FilledCans'] as num?)?.toInt() ?? 1,
+      unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? (json['PricePerCan'] as num?)?.toDouble() ?? 35.0,
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? (json['TotalAmount'] as num?)?.toDouble() ?? 35.0,
+      status: OrderStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => parsedStatus,
+      ),
+      paymentStatus: PaymentStatus.values.firstWhere(
+        (e) => e.name == json['paymentStatus'],
+        orElse: () => parsedPaymentStatus,
+      ),
+      paymentMode: PaymentMode.values.firstWhere(
+        (e) => e.name == json['paymentMode'],
+        orElse: () => parsedPaymentMode,
+      ),
+      assignedDriverId: json['assignedDriverId'],
+      assignedDriverName: json['assignedDriverName'] ?? json['AssignedDriver'],
+      createdAt: json['createdAt'] != null
+          ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
+          : (json['OrderDate'] != null ? (DateTime.tryParse(json['OrderDate'].toString()) ?? DateTime.now()) : DateTime.now()),
+      deliveredAt: json['deliveredAt'] != null
+          ? DateTime.tryParse(json['deliveredAt'].toString())
+          : (json['DeliveryDate'] != null ? DateTime.tryParse(json['DeliveryDate'].toString()) : null),
+      emptyCansCollected: (json['emptyCansCollected'] as num?)?.toInt() ?? (json['EmptyReturned'] as num?)?.toInt() ?? 0,
+      damagedCansReported: (json['damagedCansReported'] as num?)?.toInt() ?? 0,
+      notes: json['notes'] ?? json['Remarks'] ?? '',
+    );
+  }
 
   OrderModel copyWith({
     String? id,

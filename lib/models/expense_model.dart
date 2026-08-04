@@ -39,4 +39,22 @@ class ExpenseModel {
             ? DateTime.parse(json['date'])
             : DateTime.now(),
       );
+
+  ExpenseModel copyWith({
+    String? id,
+    ExpenseCategory? category,
+    double? amount,
+    String? description,
+    String? spentBy,
+    DateTime? date,
+  }) {
+    return ExpenseModel(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      description: description ?? this.description,
+      spentBy: spentBy ?? this.spentBy,
+      date: date ?? this.date,
+    );
+  }
 }

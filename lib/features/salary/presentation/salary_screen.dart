@@ -31,7 +31,7 @@ class _SalaryScreenState extends ConsumerState<SalaryScreen> {
     }
 
     EmployeeModel selectedEmp = employees.first;
-    final monthCtrl = TextEditingController(text: 'July 2026');
+    final monthCtrl = TextEditingController(text: AppFormatters.formatMonthYear(DateTime.now()));
     final baseCtrl = TextEditingController(text: selectedEmp.baseSalary.toString());
     final advancesCtrl = TextEditingController(text: '0.0');
     final bonusCtrl = TextEditingController(text: '0.0');

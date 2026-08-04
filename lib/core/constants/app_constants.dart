@@ -17,7 +17,7 @@ class AppConstants {
   static const String settingsBoxName = 'settings_box';
 
   // Default AppScript Endpoint (Configurable in Settings)
-  static const String defaultAppsScriptUrl = 'https://script.google.com/macros/s/AKfycbx_placeholder_puredrop/exec';
+  static const String defaultAppsScriptUrl = 'https://script.google.com/macros/s/AKfycbz2MXLe0l8Y3HSWGS_WgWT9v_Mslp7-LHOaPsdb_0F9dW6pCRIeeI-YG7b-17xECXO8tQ/exec';
 
   // Card Styling Constants
   static const double cardRadius = 18.0;

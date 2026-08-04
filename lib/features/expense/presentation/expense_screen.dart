@@ -23,12 +23,14 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
   void _showAddExpenseDialog() {
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    final spentByCtrl = TextEditingController(text: 'Admin');
+    final spentByCtrl = TextEditingController();
     ExpenseCategory selectedCat = ExpenseCategory.petrol;
     final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return AlertDialog(
@@ -45,9 +47,11 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                       items: ExpenseCategory.values.map((cat) {
                         return DropdownMenuItem(value: cat, child: Text(cat.displayName));
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedCat = val);
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) setModalState(() => selectedCat = val);
+                            },
                     ),
                     const SizedBox(height: 12),
                     CustomTextField(label: 'Amount (₹)', controller: amountCtrl, keyboardType: TextInputType.number),
@@ -60,26 +64,48 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final item = ExpenseModel(
-                      id: '',
-                      category: selectedCat,
-                      amount: double.tryParse(amountCtrl.text) ?? 0.0,
-                      description: descCtrl.text.trim(),
-                      spentBy: spentByCtrl.text.trim(),
-                      date: DateTime.now(),
-                    );
-                    ref.read(expenseProvider.notifier).addExpense(item);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Expense logged successfully!')),
-                    );
-                  }
-                },
-                child: const Text('Save Expense'),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (formKey.currentState!.validate()) {
+                          setModalState(() => isSaving = true);
+                          try {
+                            final item = ExpenseModel(
+                              id: '',
+                              category: selectedCat,
+                              amount: double.tryParse(amountCtrl.text) ?? 0.0,
+                              description: descCtrl.text.trim(),
+                              spentBy: spentByCtrl.text.trim(),
+                              date: DateTime.now(),
+                            );
+                            await ref.read(expenseProvider.notifier).addExpense(item);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('✅ Expense saved to Google Sheets!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('❌ Error saving expense: $e'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Expense'),
               ),
             ],
           );
@@ -194,44 +220,47 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                     buttonLabel: 'Add Expense',
                     onButtonPressed: () => _showAddExpenseDialog(),
                   )
-                : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final item = filtered[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: CustomCard(
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: AppColors.errorLight,
-                              child: Icon(Icons.receipt_long, color: AppColors.error),
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item.category.displayName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                : RefreshIndicator(
+                    onRefresh: () => ref.read(expenseProvider.notifier).fetchLive(),
+                    child: ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final item = filtered[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: CustomCard(
+                            child: ListTile(
+                              leading: const CircleAvatar(
+                                backgroundColor: AppColors.errorLight,
+                                child: Icon(Icons.receipt_long, color: AppColors.error),
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.category.displayName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  AppFormatters.formatCurrency(item.amount),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
-                                ),
-                              ],
-                            ),
-                            subtitle: Text(
-                              '${item.description} • Spent by: ${item.spentBy} • ${AppFormatters.formatDateTime(item.date)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    AppFormatters.formatCurrency(item.amount),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                '${item.description} • Spent by: ${item.spentBy} • ${AppFormatters.formatDateTime(item.date)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],

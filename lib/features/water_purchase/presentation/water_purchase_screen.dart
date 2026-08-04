@@ -19,15 +19,17 @@ class WaterPurchaseScreen extends ConsumerStatefulWidget {
 
 class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
   void _showAddWaterPurchaseDialog() {
-    final plantCtrl = TextEditingController(text: 'Aqua Pure Plant #1');
-    final cansCtrl = TextEditingController(text: '100');
-    final costCtrl = TextEditingController(text: '15.0');
+    final plantCtrl = TextEditingController();
+    final cansCtrl = TextEditingController();
+    final costCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     PaymentStatus selectedPaymentStatus = PaymentStatus.paid;
     final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return AlertDialog(
@@ -69,9 +71,11 @@ class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
                       items: PaymentStatus.values.map((s) {
                         return DropdownMenuItem(value: s, child: Text(s.displayName));
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedPaymentStatus = val);
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) setModalState(() => selectedPaymentStatus = val);
+                            },
                     ),
                     const SizedBox(height: 12),
                     CustomTextField(
@@ -83,30 +87,52 @@ class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final cans = int.tryParse(cansCtrl.text) ?? 0;
-                    final cost = double.tryParse(costCtrl.text) ?? 15.0;
-                    final item = WaterPurchaseModel(
-                      id: '',
-                      plantName: plantCtrl.text.trim(),
-                      cansPurchased: cans,
-                      costPerCan: cost,
-                      totalCost: cans * cost,
-                      paymentStatus: selectedPaymentStatus,
-                      date: DateTime.now(),
-                      notes: notesCtrl.text.trim(),
-                    );
-                    ref.read(waterPurchaseProvider.notifier).addPurchase(item);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Water purchase batch logged & stock updated!')),
-                    );
-                  }
-                },
-                child: const Text('Log Purchase'),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (formKey.currentState!.validate()) {
+                          setModalState(() => isSaving = true);
+                          try {
+                            final cans = int.tryParse(cansCtrl.text) ?? 0;
+                            final cost = double.tryParse(costCtrl.text) ?? 15.0;
+                            final item = WaterPurchaseModel(
+                              id: '',
+                              plantName: plantCtrl.text.trim(),
+                              cansPurchased: cans,
+                              costPerCan: cost,
+                              totalCost: cans * cost,
+                              paymentStatus: selectedPaymentStatus,
+                              date: DateTime.now(),
+                              notes: notesCtrl.text.trim(),
+                            );
+                            await ref.read(waterPurchaseProvider.notifier).addPurchase(item);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('✅ Water purchase saved to Google Sheets!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('❌ Error logging purchase: $e'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Log Purchase'),
               ),
             ],
           );
@@ -175,37 +201,40 @@ class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
                     buttonLabel: 'Log Water Purchase',
                     onButtonPressed: () => _showAddWaterPurchaseDialog(),
                   )
-                : ListView.builder(
-                    itemCount: purchases.length,
-                    itemBuilder: (context, index) {
-                      final item = purchases[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: CustomCard(
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: AppColors.primaryLight,
-                              child: Icon(Icons.water, color: AppColors.primary),
-                            ),
-                            title: Text(
-                              item.plantName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              '${item.cansPurchased} Cans @ ${AppFormatters.formatCurrency(item.costPerCan)}/can • ${AppFormatters.formatDate(item.date)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Text(
-                              AppFormatters.formatCurrency(item.totalCost),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                : RefreshIndicator(
+                    onRefresh: () => ref.read(waterPurchaseProvider.notifier).fetchLive(),
+                    child: ListView.builder(
+                      itemCount: purchases.length,
+                      itemBuilder: (context, index) {
+                        final item = purchases[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: CustomCard(
+                            child: ListTile(
+                              leading: const CircleAvatar(
+                                backgroundColor: AppColors.primaryLight,
+                                child: Icon(Icons.water, color: AppColors.primary),
+                              ),
+                              title: Text(
+                                item.plantName,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                '${item.cansPurchased} Cans @ ${AppFormatters.formatCurrency(item.costPerCan)}/can • ${AppFormatters.formatDate(item.date)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Text(
+                                AppFormatters.formatCurrency(item.totalCost),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.error),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],

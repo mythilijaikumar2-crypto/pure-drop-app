@@ -1,12 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/storage/hive_service.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_card.dart';
 import '../../../core/widgets/custom_text_field.dart';
+import '../../../providers/app_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -18,6 +21,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _urlCtrl;
   bool _isSyncing = false;
+  bool _isTestingConnection = false;
 
   @override
   void initState() {
@@ -43,6 +47,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  void _resetDefaultUrl() {
+    DioClient.resetAppsScriptUrl();
+    _urlCtrl.text = AppConstants.defaultAppsScriptUrl;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('API URL restored to default Google Apps Script Web App Endpoint!'),
+        backgroundColor: AppColors.primaryDark,
+      ),
+    );
+  }
+
+  void _testApiConnection() async {
+    setState(() => _isTestingConnection = true);
+    try {
+      final dioClient = ref.read(dioClientProvider);
+      final response = await dioClient.getAction('getDashboard');
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Connected Successfully! Google Apps Script & Sheets are Live.'),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ Connection Warning: HTTP ${response.statusCode} returned.'),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        final code = e.response?.statusCode ?? 'Network/Timeout';
+        String errorMsg = 'Failed to connect (Error Code: $code). ';
+        if (code == 401) {
+          errorMsg += '401 Unauthorized: Please check Web App deployment settings ("Anyone" access required).';
+        } else if (code == 404) {
+          errorMsg += '404 Not Found: Check URL ending with /exec.';
+        } else {
+          errorMsg += e.message ?? 'Check internet connection.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ $errorMsg'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Test connection exception: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTestingConnection = false);
+    }
+  }
+
   void _triggerManualSync() async {
     setState(() => _isSyncing = true);
     await Future.delayed(const Duration(seconds: 2));
@@ -57,357 +130,339 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showGoogleScriptCodeDialog() {
     const googleScriptCode = '''
 /**
- * Pure Drop Aqua ERP - Google Apps Script Backend API
- * Production-Ready REST API for Water Can Distribution ERP
+ * Pure Drop Aqua ERP - Advanced Production-Ready Google Apps Script Backend
+ * Module: Complete Finance, Income, Deposit, Investment, Profit & Business Analytics
+ * 
+ * Instructions:
+ * 1. Open your Google Spreadsheet ("Pure Drop Aqua ERP Database")
+ * 2. Go to Extensions -> Apps Script
+ * 3. Replace all content in Code.gs with this code
+ * 4. Run setupDatabase() once manually OR it will auto-run on first API call
+ * 5. Click Deploy -> New Deployment -> Select "Web App"
+ *    - Execute as: "Me"
+ *    - Who has access: "Anyone"
+ * 6. Copy the generated Web App URL into Pure Drop Aqua ERP Settings screen!
  */
 
 const SPREADSHEET_NAME = "Pure Drop Aqua ERP Database";
 
+// Column Definitions for all 16 Sheets
 const SHEETS_SCHEMA = {
-  "Customers": ["CustomerID", "CustomerName", "MobileNumber", "AlternativeNumber", "Address", "Area", "Latitude", "Longitude", "CustomerType", "DepositAmount", "FilledCanBalance", "EmptyCanBalance", "PendingAmount", "Status", "CreatedDate"],
-  "Orders": ["OrderID", "CustomerID", "CustomerName", "OrderDate", "DeliveryDate", "FilledCans", "EmptyReturned", "PricePerCan", "TotalAmount", "PaymentStatus", "DeliveryStatus", "AssignedDriver", "CreatedBy"],
-  "Inventory": ["Date", "TotalCans", "FilledCans", "EmptyCans", "DamagedCans", "CustomerBalance", "AvailableStock"],
-  "WaterPurchase": ["PurchaseID", "SupplierName", "PurchaseDate", "Quantity", "PricePerCan", "TotalCost", "Remarks"],
-  "Delivery": ["DeliveryID", "OrderID", "DriverName", "DeliveryDate", "DeliveryStatus", "CollectedEmpty", "CollectedPayment", "Remarks"],
-  "Employees": ["EmployeeID", "EmployeeName", "Username", "Password", "Role", "Phone", "Salary", "Status"],
-  "Expenses": ["ExpenseID", "ExpenseDate", "Category", "Description", "Amount", "PaidBy"],
-  "Payments": ["PaymentID", "CustomerID", "OrderID", "Amount", "PaymentMethod", "PaymentDate", "Status"],
-  "Dashboard": ["TodayOrders", "Revenue", "Expenses", "NetProfit", "FilledStock", "EmptyStock", "PendingPayments", "CompletedDeliveries", "LastUpdated"]
+  "Customers": [
+    "CustomerID", "CustomerName", "MobileNumber", "AlternativeNumber",
+    "Address", "Area", "Latitude", "Longitude", "SubscriptionType",
+    "DepositAmount", "FilledCanBalance", "EmptyCanBalance", "PendingAmount",
+    "Status", "CreatedDate", "LastDeliveryDate", "NextDeliveryDate", "Notes"
+  ],
+  "Orders": [
+    "OrderID", "CustomerID", "CustomerName", "OrderDate", "DeliveryDate",
+    "FilledCans", "EmptyReturned", "PricePerCan", "TotalAmount",
+    "PaymentStatus", "DeliveryStatus", "AssignedDriver", "CreatedBy", "CreatedDate"
+  ],
+  "Inventory": [
+    "InventoryID", "Date", "FilledCans", "EmptyCans", "DamagedCans",
+    "LostCans", "AvailableStock", "Remarks"
+  ],
+  "WaterPurchase": [
+    "PurchaseID", "SupplierName", "PurchaseDate", "Quantity",
+    "PricePerCan", "TotalCost", "InvoiceNumber", "Remarks"
+  ],
+  "Expenses": [
+    "ExpenseID", "ExpenseDate", "Category", "Amount", "Description", "CreatedBy"
+  ],
+  "Employees": [
+    "EmployeeID", "EmployeeName", "Role", "Phone", "Salary",
+    "Address", "Status", "JoiningDate"
+  ],
+  "Delivery": [
+    "DeliveryID", "DriverName", "CustomerID", "CustomerName",
+    "Route", "DeliveryDate", "DeliveryStatus", "PaymentCollected", "EmptyCollected", "Remarks"
+  ],
+  "Reports": [
+    "ReportID", "ReportType", "GeneratedDate", "GeneratedBy", "Summary"
+  ],
+  "Settings": [
+    "SettingKey", "SettingValue", "Description"
+  ],
+  "Income": [
+    "IncomeID", "Date", "IncomeType", "CustomerID", "CustomerName",
+    "OrderID", "Amount", "PaymentMethod", "ReferenceNumber", "CollectedBy",
+    "Status", "Remarks", "CreatedAt"
+  ],
+  "Deposits": [
+    "DepositID", "CustomerID", "CustomerName", "DepositAmount", "ReturnedAmount",
+    "CurrentBalance", "DepositDate", "ReturnDate", "Status", "Remarks"
+  ],
+  "Investments": [
+    "InvestmentID", "Date", "InvestorName", "InvestmentType", "Amount",
+    "Purpose", "PaymentMethod", "ReferenceNumber", "Remarks"
+  ],
+  "CanPurchase": [
+    "PurchaseID", "SupplierName", "PurchaseDate", "CanQuantity", "PricePerCan",
+    "GST", "TransportCost", "OtherCharges", "TotalAmount", "InvoiceNumber", "Remarks"
+  ],
+  "Transactions": [
+    "TransactionID", "Date", "TransactionType", "Credit", "Debit",
+    "OpeningBalance", "ClosingBalance", "ReferenceID", "PaymentMethod", "Remarks"
+  ],
+  "ProfitLoss": [
+    "Date", "SalesIncome", "DepositIncome", "OtherIncome", "TotalIncome",
+    "TotalExpense", "NetProfit", "NetLoss", "ProfitMargin"
+  ],
+  "Assets": [
+    "AssetID", "AssetName", "Category", "PurchaseDate", "PurchaseCost",
+    "CurrentValue", "Status", "Remarks"
+  ]
 };
 
-function doGet(e) {
-  initDatabase();
-  return responseJSON(true, "Pure Drop Aqua API Active", { status: "Active", timestamp: new Date() });
+// --- DATABASE SETUP & COLUMN VALIDATION ---
+
+function setupDatabase() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  for (const sheetName in SHEETS_SCHEMA) {
+    const requiredHeaders = SHEETS_SCHEMA[sheetName];
+    ensureSheetExists(ss, sheetName, requiredHeaders);
+  }
 }
 
+function ensureSheetExists(ss, sheetName, requiredHeaders) {
+  let sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(requiredHeaders);
+    formatHeaderRow(sheet, requiredHeaders.length);
+  } else {
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+
+    if (lastRow === 0 || lastCol === 0) {
+      sheet.appendRow(requiredHeaders);
+      formatHeaderRow(sheet, requiredHeaders.length);
+    } else {
+      const existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+      const missingHeaders = [];
+
+      for (let i = 0; i < requiredHeaders.length; i++) {
+        if (!existingHeaders.includes(requiredHeaders[i])) {
+          missingHeaders.push(requiredHeaders[i]);
+        }
+      }
+
+      if (missingHeaders.length > 0) {
+        const startCol = lastCol + 1;
+        sheet.getRange(1, startCol, 1, missingHeaders.length).setValues([missingHeaders]);
+        formatHeaderRow(sheet, existingHeaders.length + missingHeaders.length);
+      } else {
+        formatHeaderRow(sheet, existingHeaders.length);
+      }
+    }
+  }
+}
+
+function formatHeaderRow(sheet, numColumns) {
+  try {
+    sheet.setFrozenRows(1);
+    const headerRange = sheet.getRange(1, 1, 1, numColumns);
+    headerRange.setFontWeight("bold")
+               .setBackground("#1DAEFF")
+               .setFontColor("#FFFFFF")
+               .setVerticalAlignment("middle")
+               .setHorizontalAlignment("left");
+
+    if (!sheet.getFilter() && sheet.getLastRow() > 0) {
+      sheet.getRange(1, 1, Math.max(1, sheet.getLastRow()), numColumns).createFilter();
+    }
+  } catch (e) {
+    Logger.log("Formatting notice for " + sheet.getName() + ": " + e.toString());
+  }
+}
+
+function getSheet(sheetName) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+}
+
+function getHeaders(sheetName) {
+  const sheet = getSheet(sheetName);
+  if (!sheet || sheet.getLastColumn() === 0) return SHEETS_SCHEMA[sheetName] || [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+}
+
+// --- HTTP POST ROUTER ---
 function doPost(e) {
   try {
-    initDatabase();
-    if (!e || !e.postData || !e.postData.contents) return responseJSON(false, "Invalid payload", null);
-    const request = JSON.parse(e.postData.contents);
-    const action = request.action;
-    const payload = request.payload || {};
+    setupDatabase();
+    let action = "";
+    let payload = {};
+
+    if (e && e.postData && e.postData.contents) {
+      try {
+        const request = JSON.parse(e.postData.contents);
+        action = request.action || (e.parameter && e.parameter.action ? e.parameter.action : "");
+        payload = request.payload || request;
+      } catch (err) {
+        action = (e.parameter && e.parameter.action) ? e.parameter.action : "";
+        if (e.parameter && e.parameter.payload) {
+          try { payload = JSON.parse(e.parameter.payload); } catch (_) { payload = e.parameter; }
+        } else {
+          payload = e.parameter || {};
+        }
+      }
+    } else if (e && e.parameter) {
+      action = e.parameter.action || "";
+      if (e.parameter.payload) {
+        try { payload = JSON.parse(e.parameter.payload); } catch (_) { payload = e.parameter; }
+      } else {
+        payload = e.parameter || {};
+      }
+    }
+
+    if (!action) {
+      return responseJSON(false, "Invalid request payload - Action missing", null);
+    }
 
     switch (action) {
-      case "/login": return handleLogin(payload);
-      case "/customers": return handleSaveCustomer(payload);
-      case "/orders": return handleCreateOrder(payload);
-      case "/delivery": return handleCompleteDelivery(payload);
-      case "/inventory": return handleUpdateInventory(payload);
-      case "/waterPurchase": return handleAddWaterPurchase(payload);
-      case "/employees": return handleSaveEmployee(payload);
-      case "/expenses": return handleAddExpense(payload);
-      case "/payments": return handleRecordPayment(payload);
-      default: return responseJSON(true, "Action processed", payload);
+      case "/login":
+      case "login":
+        return handleLogin(payload);
+      case "/customers":
+      case "saveCustomer":
+        return handleSaveCustomer(payload);
+      case "deleteCustomer":
+        return handleDeleteItem("Customers", "CustomerID", payload.id || payload.customerId);
+      case "/orders":
+      case "createOrder":
+        return handleCreateOrder(payload);
+      case "/updateOrder":
+      case "updateOrder":
+      case "updateOrderStatus":
+        return handleUpdateOrder(payload);
+      case "deleteOrder":
+        return handleDeleteItem("Orders", "OrderID", payload.id || payload.orderId);
+      case "/delivery":
+      case "completeDelivery":
+        return handleCompleteDelivery(payload);
+      case "/inventory":
+      case "updateInventory":
+        return handleUpdateInventory(payload);
+      case "/waterPurchase":
+      case "addWaterPurchase":
+        return handleAddWaterPurchase(payload);
+      case "/employees":
+      case "saveEmployee":
+        return handleSaveEmployee(payload);
+      case "deleteEmployee":
+        return handleDeleteItem("Employees", "EmployeeID", payload.id || payload.employeeId);
+      case "/expenses":
+      case "addExpense":
+        return handleAddExpense(payload);
+      case "/payments":
+      case "recordPayment":
+        return handleRecordPayment(payload);
+
+      // --- FINANCE MODULE ENDPOINTS ---
+      case "/income":
+      case "saveIncome":
+        return handleSaveIncome(payload);
+      case "/deposits":
+      case "saveDeposit":
+        return handleSaveDeposit(payload);
+      case "refundDeposit":
+        return handleRefundDeposit(payload);
+      case "/investments":
+      case "saveInvestment":
+        return handleSaveInvestment(payload);
+      case "/canPurchase":
+      case "addCanPurchase":
+        return handleAddCanPurchase(payload);
+      case "/transactions":
+      case "addTransaction":
+        return handleAddTransaction(payload);
+      case "/assets":
+      case "saveAsset":
+        return handleSaveAsset(payload);
+
+      case "/reports":
+      case "addReport":
+        return handleAddReport(payload);
+      case "/settings":
+      case "saveSetting":
+        return handleSaveSetting(payload);
+      case "/dashboard":
+      case "recalculateDashboard":
+        return handleRecalculateDashboard();
+
+      default:
+        return responseJSON(false, "Unknown API action: " + action, null);
     }
-  } catch (err) {
-    return responseJSON(false, err.toString(), null);
+  } catch (error) {
+    return responseJSON(false, "Server Exception: " + error.toString(), null);
   }
 }
 
-function handleLogin(payload) {
-  const sheet = getSheet("Employees");
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][2]).trim().toLowerCase() === String(payload.username || "").trim().toLowerCase() &&
-        String(data[i][3]) === String(payload.password || "")) {
-      return responseJSON(true, "Login successful", {
-        employeeId: data[i][0],
-        employeeName: data[i][1],
-        username: data[i][2],
-        role: data[i][4],
-        phone: data[i][5]
-      });
-    }
-  }
-  return responseJSON(false, "Invalid username or password", null);
-}
-
-function handleSaveCustomer(payload) {
-  const sheet = getSheet("Customers");
-  const data = sheet.getDataRange().getValues();
-  const custId = payload.id || ("CUST-" + Math.floor(1000 + Math.random() * 9000));
-  const mobile = String(payload.phone || "").trim();
-
-  let rowIndex = -1;
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(custId)) {
-      rowIndex = i + 1;
-      break;
-    }
-    if (!payload.id && mobile && String(data[i][2]).trim() === mobile) {
-      return responseJSON(false, "Customer with this mobile number already exists", null);
-    }
-  }
-
-  const rowData = [
-    custId,
-    payload.name || "Unknown",
-    mobile,
-    payload.alternativePhone || "",
-    payload.address || "",
-    payload.area || "",
-    payload.latitude || 0,
-    payload.longitude || 0,
-    payload.customerType || "Residential",
-    payload.depositAmount || 0,
-    payload.filledCanBalance || 0,
-    payload.emptyCanBalance || 0,
-    payload.pendingAmount || 0,
-    payload.status || "Active",
-    new Date().toISOString()
-  ];
-
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
-  } else {
-    sheet.appendRow(rowData);
-  }
-  updateDashboard();
-  return responseJSON(true, "Customer saved successfully", { id: custId, ...payload });
-}
-
-function handleCreateOrder(payload) {
-  const sheet = getSheet("Orders");
-  const orderId = payload.id || ("ORD-" + Math.floor(1000 + Math.random() * 9000));
-  const filled = Number(payload.filledCans || 0);
-  const price = Number(payload.pricePerCan || 0);
-  const total = payload.totalAmount || (filled * price);
-
-  const rowData = [
-    orderId,
-    payload.customerId || "",
-    payload.customerName || "",
-    payload.orderDate || new Date().toISOString(),
-    payload.deliveryDate || new Date().toISOString(),
-    filled,
-    payload.emptyReturned || 0,
-    price,
-    total,
-    payload.paymentStatus || "Pending",
-    payload.deliveryStatus || "Pending",
-    payload.assignedDriver || "",
-    payload.createdBy || "System"
-  ];
-
-  sheet.appendRow(rowData);
-  updateDashboard();
-  return responseJSON(true, "Order created successfully", { orderId: orderId, totalAmount: total });
-}
-
-function handleCompleteDelivery(payload) {
-  const sheet = getSheet("Delivery");
-  const deliveryId = "DEL-" + Math.floor(1000 + Math.random() * 9000);
-  const rowData = [
-    deliveryId,
-    payload.orderId || "",
-    payload.driverName || "",
-    new Date().toISOString(),
-    "Completed",
-    payload.collectedEmpty || 0,
-    payload.collectedPayment || 0,
-    payload.remarks || ""
-  ];
-  sheet.appendRow(rowData);
-
-  if (payload.orderId) {
-    const orderSheet = getSheet("Orders");
-    const oData = orderSheet.getDataRange().getValues();
-    for (let i = 1; i < oData.length; i++) {
-      if (String(oData[i][0]) === String(payload.orderId)) {
-        orderSheet.getRange(i + 1, 11).setValue("Delivered");
-        break;
-      }
-    }
-  }
-  updateDashboard();
-  return responseJSON(true, "Delivery completed successfully", { deliveryId: deliveryId });
-}
-
-function handleUpdateInventory(payload) {
-  const sheet = getSheet("Inventory");
-  const total = Number(payload.totalCans || 500);
-  const filled = Number(payload.filledCans || 0);
-  const empty = Number(payload.emptyCans || 0);
-  const damaged = Number(payload.damagedCans || 0);
-  const custBal = Number(payload.customerBalance || 0);
-  const available = filled + empty;
-
-  const rowData = [
-    new Date().toISOString(),
-    total,
-    filled,
-    empty,
-    damaged,
-    custBal,
-    available
-  ];
-  sheet.appendRow(rowData);
-  updateDashboard();
-  return responseJSON(true, "Inventory updated successfully", payload);
-}
-
-function handleAddWaterPurchase(payload) {
-  const sheet = getSheet("WaterPurchase");
-  const purId = "PUR-" + Math.floor(1000 + Math.random() * 9000);
-  const qty = Number(payload.quantity || 0);
-  const price = Number(payload.pricePerCan || 0);
-  const totalCost = qty * price;
-
-  const rowData = [
-    purId,
-    payload.supplierName || "",
-    payload.purchaseDate || new Date().toISOString(),
-    qty,
-    price,
-    totalCost,
-    payload.remarks || ""
-  ];
-  sheet.appendRow(rowData);
-  updateDashboard();
-  return responseJSON(true, "Water purchase logged successfully", { purchaseId: purId, totalCost: totalCost });
-}
-
-function handleSaveEmployee(payload) {
-  const sheet = getSheet("Employees");
-  const data = sheet.getDataRange().getValues();
-  const empId = payload.id || ("EMP-" + Math.floor(1000 + Math.random() * 9000));
-
-  let rowIndex = -1;
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(empId)) {
-      rowIndex = i + 1;
-      break;
-    }
-  }
-
-  const rowData = [
-    empId,
-    payload.name || "",
-    payload.username || "",
-    payload.password || "123456",
-    payload.role || "Driver",
-    payload.phone || "",
-    payload.salary || 0,
-    payload.status || "Active"
-  ];
-
-  if (rowIndex > 0) {
-    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
-  } else {
-    sheet.appendRow(rowData);
-  }
-  return responseJSON(true, "Employee saved successfully", { id: empId, ...payload });
-}
-
-function handleAddExpense(payload) {
-  const sheet = getSheet("Expenses");
-  const expId = "EXP-" + Math.floor(1000 + Math.random() * 9000);
-  const rowData = [
-    expId,
-    payload.date || new Date().toISOString(),
-    payload.category || "General",
-    payload.description || "",
-    Number(payload.amount || 0),
-    payload.paidBy || "Admin"
-  ];
-  sheet.appendRow(rowData);
-  updateDashboard();
-  return responseJSON(true, "Expense logged successfully", { expenseId: expId });
-}
-
-function handleRecordPayment(payload) {
-  const sheet = getSheet("Payments");
-  const payId = "PAY-" + Math.floor(1000 + Math.random() * 9000);
-  const amount = Number(payload.amount || 0);
-
-  const rowData = [
-    payId,
-    payload.customerId || "",
-    payload.orderId || "",
-    amount,
-    payload.paymentMethod || "Cash",
-    payload.date || new Date().toISOString(),
-    "Completed"
-  ];
-  sheet.appendRow(rowData);
-
-  if (payload.customerId) {
-    const custSheet = getSheet("Customers");
-    const cData = custSheet.getDataRange().getValues();
-    for (let i = 1; i < cData.length; i++) {
-      if (String(cData[i][0]) === String(payload.customerId)) {
-        const currentDues = Number(cData[i][12] || 0);
-        const newDues = Math.max(0, currentDues - amount);
-        custSheet.getRange(i + 1, 13).setValue(newDues);
-        break;
-      }
-    }
-  }
-  updateDashboard();
-  return responseJSON(true, "Payment recorded successfully", { paymentId: payId });
-}
-
-function updateDashboard() {
+// --- HTTP GET ROUTER ---
+function doGet(e) {
   try {
-    const dashSheet = getSheet("Dashboard");
-    const ordersSheet = getSheet("Orders");
-    const expSheet = getSheet("Expenses");
-    const invSheet = getSheet("Inventory");
-    const custSheet = getSheet("Customers");
+    setupDatabase();
+    const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "/dashboard";
 
-    const orders = ordersSheet.getDataRange().getValues();
-    let todayOrders = 0, totalRevenue = 0, completedDeliveries = 0;
-    for (let i = 1; i < orders.length; i++) {
-      todayOrders++;
-      totalRevenue += Number(orders[i][8] || 0);
-      if (String(orders[i][10]) === "Delivered") completedDeliveries++;
+    switch (action) {
+      case "/customers":
+      case "getCustomers":
+        return responseJSON(true, "Customers fetched", getSheetData("Customers"));
+      case "/orders":
+      case "getOrders":
+        return responseJSON(true, "Orders fetched", getSheetData("Orders"));
+      case "/inventory":
+      case "getInventory":
+        return responseJSON(true, "Inventory fetched", getSheetData("Inventory"));
+      case "/waterPurchase":
+      case "getWaterPurchases":
+        return responseJSON(true, "Water purchases fetched", getSheetData("WaterPurchase"));
+      case "/employees":
+      case "getEmployees":
+        return responseJSON(true, "Employees fetched", getSheetData("Employees"));
+      case "/expenses":
+      case "getExpenses":
+        return responseJSON(true, "Expenses fetched", getSheetData("Expenses"));
+      case "/delivery":
+      case "getDeliveries":
+        return responseJSON(true, "Deliveries fetched", getSheetData("Delivery"));
+      case "/reports":
+      case "getReports":
+        return responseJSON(true, "Reports fetched", getSheetData("Reports"));
+      case "/settings":
+      case "getSettings":
+        return responseJSON(true, "Settings fetched", getSheetData("Settings"));
+      case "/income":
+      case "getIncome":
+        return responseJSON(true, "Income records fetched", getSheetData("Income"));
+      case "/deposits":
+      case "getDeposits":
+        return responseJSON(true, "Deposits fetched", getSheetData("Deposits"));
+      case "/investments":
+      case "getInvestments":
+        return responseJSON(true, "Investments fetched", getSheetData("Investments"));
+      case "/canPurchase":
+      case "getCanPurchases":
+        return responseJSON(true, "Can purchases fetched", getSheetData("CanPurchase"));
+      case "/transactions":
+      case "getTransactions":
+        return responseJSON(true, "Transactions fetched", getSheetData("Transactions"));
+      case "/profitLoss":
+      case "getProfitLoss":
+        return responseJSON(true, "Profit & Loss fetched", getSheetData("ProfitLoss"));
+      case "/assets":
+      case "getAssets":
+        return responseJSON(true, "Assets fetched", getSheetData("Assets"));
+      case "/dashboard":
+      case "getDashboard":
+        return responseJSON(true, "Dashboard metrics fetched", calculateDashboardMetrics());
+      default:
+        return responseJSON(true, "Pure Drop Aqua ERP API is Live", { status: "Active", timestamp: new Date() });
     }
-
-    const expenses = expSheet.getDataRange().getValues();
-    let totalExpenses = 0;
-    for (let i = 1; i < expenses.length; i++) {
-      totalExpenses += Number(expenses[i][4] || 0);
-    }
-
-    const netProfit = totalRevenue - totalExpenses;
-
-    const customers = custSheet.getDataRange().getValues();
-    let pendingPayments = 0;
-    for (let i = 1; i < customers.length; i++) {
-      pendingPayments += Number(customers[i][12] || 0);
-    }
-
-    const inv = invSheet.getDataRange().getValues();
-    let filledStock = 0, emptyStock = 0;
-    if (inv.length > 1) {
-      const lastRow = inv[inv.length - 1];
-      filledStock = Number(lastRow[2] || 0);
-      emptyStock = Number(lastRow[3] || 0);
-    }
-
-    const dashRow = [
-      todayOrders, totalRevenue, totalExpenses, netProfit, filledStock, emptyStock, pendingPayments, completedDeliveries, new Date().toISOString()
-    ];
-
-    dashSheet.getRange(2, 1, 1, dashRow.length).setValues([dashRow]);
-  } catch (err) {
-    Logger.log("Dashboard update error: " + err.toString());
-  }
-}
-
-function getSheet(name) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  return ss.getSheetByName(name) || ss.insertSheet(name);
-}
-
-function initDatabase() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  for (const name in SHEETS_SCHEMA) {
-    let sheet = ss.getSheetByName(name) || ss.insertSheet(name);
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(SHEETS_SCHEMA[name]);
-    }
+  } catch (error) {
+    return responseJSON(false, "Server Exception: " + error.toString(), null);
   }
 }
 
@@ -491,42 +546,36 @@ function responseJSON(success, message, data) {
                   hint: 'https://script.google.com/macros/s/.../exec',
                 ),
                 const SizedBox(height: 16),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 450;
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _showGoogleScriptCodeDialog(),
-                            icon: const Icon(Icons.code),
-                            label: const Text('View AppsScript Code'),
-                          ),
-                          const SizedBox(height: 10),
-                          CustomButton(
-                            label: 'Save Endpoint',
-                            onPressed: _saveSettings,
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _showGoogleScriptCodeDialog(),
-                          icon: const Icon(Icons.code),
-                          label: const Text('View AppsScript Code'),
-                        ),
-                        const Spacer(),
-                        CustomButton(
-                          label: 'Save Endpoint',
-                          width: 150,
-                          onPressed: _saveSettings,
-                        ),
-                      ],
-                    );
-                  },
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _showGoogleScriptCodeDialog(),
+                      icon: const Icon(Icons.code, size: 18),
+                      label: const Text('View Code'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _resetDefaultUrl,
+                      icon: const Icon(Icons.restore, size: 18),
+                      label: const Text('Reset URL'),
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.warning),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _isTestingConnection ? null : _testApiConnection,
+                      icon: _isTestingConnection
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.network_check_rounded, size: 18),
+                      label: Text(_isTestingConnection ? 'Testing...' : 'Test Connection'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.info, foregroundColor: Colors.white),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _saveSettings,
+                      icon: const Icon(Icons.save_rounded, size: 18),
+                      label: const Text('Save Endpoint'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                    ),
+                  ],
                 ),
               ],
             ),

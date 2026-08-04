@@ -28,14 +28,17 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
   }
 
   void _showCompleteDeliveryDialog(OrderModel order) {
+    final cansDeliveredCtrl = TextEditingController(text: order.quantity.toString());
     final emptyCansCtrl = TextEditingController(text: order.quantity.toString());
     final damagedCansCtrl = TextEditingController(text: '0');
     PaymentMode selectedPaymentMode = PaymentMode.upi;
     PaymentStatus selectedPaymentStatus = PaymentStatus.paid;
     final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return AlertDialog(
@@ -53,14 +56,23 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Text('Delivering: ${order.quantity} Filled Cans'),
                     Text('Total Amount: ${AppFormatters.formatCurrency(order.totalAmount)}', style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold)),
                     const Divider(height: 20),
+
+                    CustomTextField(
+                      label: 'Cans Delivered (Filled Cans)',
+                      controller: cansDeliveredCtrl,
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.water_drop_outlined,
+                      hint: 'Enter quantity of filled cans delivered',
+                    ),
+                    const SizedBox(height: 12),
 
                     CustomTextField(
                       label: 'Empty Cans Collected',
                       controller: emptyCansCtrl,
                       keyboardType: TextInputType.number,
+                      prefixIcon: Icons.crop_portrait,
                     ),
                     const SizedBox(height: 12),
 
@@ -68,6 +80,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                       label: 'Damaged Cans Reported',
                       controller: damagedCansCtrl,
                       keyboardType: TextInputType.number,
+                      prefixIcon: Icons.warning_amber_outlined,
                     ),
                     const SizedBox(height: 12),
 
@@ -79,9 +92,11 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                       items: PaymentMode.values.map((mode) {
                         return DropdownMenuItem(value: mode, child: Text(mode.displayName));
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedPaymentMode = val);
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) setModalState(() => selectedPaymentMode = val);
+                            },
                     ),
                     const SizedBox(height: 12),
 
@@ -93,38 +108,62 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                       items: PaymentStatus.values.map((status) {
                         return DropdownMenuItem(value: status, child: Text(status.displayName));
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedPaymentStatus = val);
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) setModalState(() => selectedPaymentStatus = val);
+                            },
                     ),
                   ],
                 ),
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton.icon(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final emptyCollected = int.tryParse(emptyCansCtrl.text) ?? 0;
-                    final damagedReported = int.tryParse(damagedCansCtrl.text) ?? 0;
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (formKey.currentState!.validate()) {
+                          setModalState(() => isSaving = true);
+                          try {
+                            final emptyCollected = int.tryParse(emptyCansCtrl.text) ?? 0;
+                            final damagedReported = int.tryParse(damagedCansCtrl.text) ?? 0;
 
-                    ref.read(orderProvider.notifier).updateStatus(
-                          order.id,
-                          OrderStatus.delivered,
-                          emptyCansCollected: emptyCollected,
-                          damagedCansReported: damagedReported,
-                          paymentMode: selectedPaymentMode,
-                          paymentStatus: selectedPaymentStatus,
-                        );
+                            await ref.read(orderProvider.notifier).updateStatus(
+                                  order.id,
+                                  OrderStatus.delivered,
+                                  emptyCansCollected: emptyCollected,
+                                  damagedCansReported: damagedReported,
+                                  paymentMode: selectedPaymentMode,
+                                  paymentStatus: selectedPaymentStatus,
+                                );
 
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Order ${order.id} marked as DELIVERED!')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.check_circle),
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✅ Order ${order.id} marked as DELIVERED in Google Sheets!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('❌ Error updating delivery status: $e'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                icon: isSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle),
                 label: const Text('Confirm Delivery'),
               ),
             ],

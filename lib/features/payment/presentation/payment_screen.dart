@@ -36,9 +36,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final refCtrl = TextEditingController();
     PaymentMode selectedMode = PaymentMode.upi;
     final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return AlertDialog(
@@ -63,14 +65,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ),
                         );
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setModalState(() {
-                            selectedCust = val;
-                            amountCtrl.text = val.pendingDues.toString();
-                          });
-                        }
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) {
+                                setModalState(() {
+                                  selectedCust = val;
+                                  amountCtrl.text = val.pendingDues.toString();
+                                });
+                              }
+                            },
                     ),
                     const SizedBox(height: 12),
                     CustomTextField(label: 'Amount Collected (₹)', controller: amountCtrl, keyboardType: TextInputType.number),
@@ -89,9 +93,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ),
                         );
                       }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedMode = val);
-                      },
+                      onChanged: isSaving
+                          ? null
+                          : (val) {
+                              if (val != null) setModalState(() => selectedMode = val);
+                            },
                     ),
                     const SizedBox(height: 12),
                     CustomTextField(label: 'UPI Ref / Transaction ID', controller: refCtrl, hint: 'Optional reference number'),
@@ -100,27 +106,49 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
               ElevatedButton(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final item = PaymentModel(
-                      id: '',
-                      customerId: selectedCust.id,
-                      customerName: selectedCust.name,
-                      amount: double.tryParse(amountCtrl.text) ?? 0.0,
-                      paymentMode: selectedMode,
-                      referenceNo: refCtrl.text.trim(),
-                      date: DateTime.now(),
-                    );
-                    ref.read(paymentProvider.notifier).recordPayment(item);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Payment recorded for ${item.customerName}')),
-                    );
-                  }
-                },
-                child: const Text('Confirm Payment'),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (formKey.currentState!.validate()) {
+                          setModalState(() => isSaving = true);
+                          try {
+                            final item = PaymentModel(
+                              id: '',
+                              customerId: selectedCust.id,
+                              customerName: selectedCust.name,
+                              amount: double.tryParse(amountCtrl.text) ?? 0.0,
+                              paymentMode: selectedMode,
+                              referenceNo: refCtrl.text.trim(),
+                              date: DateTime.now(),
+                            );
+                            await ref.read(paymentProvider.notifier).recordPayment(item);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✅ Payment recorded for ${item.customerName} in Google Sheets!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setModalState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('❌ Error recording payment: $e'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Confirm Payment'),
               ),
             ],
           );
@@ -189,37 +217,40 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     buttonLabel: 'Record Payment',
                     onButtonPressed: () => _showCollectPaymentDialog(),
                   )
-                : ListView.builder(
-                    itemCount: payments.length,
-                    itemBuilder: (context, index) {
-                      final item = payments[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: CustomCard(
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: AppColors.successLight,
-                              child: Icon(Icons.account_balance_wallet, color: AppColors.success),
-                            ),
-                            title: Text(
-                              item.customerName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              'Mode: ${item.paymentMode.displayName} • ${AppFormatters.formatDateTime(item.date)} ${item.referenceNo.isNotEmpty ? "• Ref: ${item.referenceNo}" : ""}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Text(
-                              AppFormatters.formatCurrency(item.amount),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.success),
+                : RefreshIndicator(
+                    onRefresh: () => ref.read(paymentProvider.notifier).fetchLive(),
+                    child: ListView.builder(
+                      itemCount: payments.length,
+                      itemBuilder: (context, index) {
+                        final item = payments[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: CustomCard(
+                            child: ListTile(
+                              leading: const CircleAvatar(
+                                backgroundColor: AppColors.successLight,
+                                child: Icon(Icons.account_balance_wallet, color: AppColors.success),
+                              ),
+                              title: Text(
+                                item.customerName,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                'Mode: ${item.paymentMode.displayName} • ${AppFormatters.formatDateTime(item.date)} ${item.referenceNo.isNotEmpty ? "• Ref: ${item.referenceNo}" : ""}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Text(
+                                AppFormatters.formatCurrency(item.amount),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.success),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],

@@ -3,7 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_enums.dart';
+import '../../../core/storage/hive_service.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_card.dart';
@@ -19,12 +21,29 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController(text: 'admin');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _rememberMe = true;
   bool _obscurePassword = true;
-  UserRole _selectedRoleTab = UserRole.admin;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  void _loadSavedCredentials() {
+    final savedUsername = HiveService.getData(AppConstants.authBoxName, 'savedUsername', defaultValue: '');
+    final savedPassword = HiveService.getData(AppConstants.authBoxName, 'savedPassword', defaultValue: '');
+
+    if (savedUsername.toString().isNotEmpty) {
+      _usernameController.text = savedUsername.toString();
+    }
+    if (savedPassword.toString().isNotEmpty) {
+      _passwordController.text = savedPassword.toString();
+    }
+  }
 
   @override
   void dispose() {
@@ -69,21 +88,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  void _fillDemoAdmin() {
-    setState(() {
-      _selectedRoleTab = UserRole.admin;
-      _usernameController.text = 'admin';
-      _passwordController.text = 'admin123';
-    });
-  }
-
-  void _fillDemoDriver() {
-    setState(() {
-      _selectedRoleTab = UserRole.deliveryBoy;
-      _usernameController.text = 'driver';
-      _passwordController.text = 'driver123';
-    });
-  }
 
   void _showForgotPasswordDialog() {
     showDialog(
@@ -147,109 +151,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Official Pure Drop Aqua Logo
-                      const AppLogo(size: 160).animate().scale(duration: 400.ms),
+                      const AppLogo(size: 230).animate().scale(duration: 400.ms),
 
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Distribution & Operations ERP',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Quick Role Selector Switch
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceSubtle,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _fillDemoAdmin,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedRoleTab == UserRole.admin
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.admin_panel_settings,
-                                        color: _selectedRoleTab == UserRole.admin
-                                            ? Colors.white
-                                            : AppColors.textSecondary,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          'Admin Login',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                            color: _selectedRoleTab == UserRole.admin
-                                                ? Colors.white
-                                                : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _fillDemoDriver,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedRoleTab == UserRole.deliveryBoy
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.delivery_dining,
-                                        color: _selectedRoleTab == UserRole.deliveryBoy
-                                            ? Colors.white
-                                            : AppColors.textSecondary,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          'Driver Login',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                            color: _selectedRoleTab == UserRole.deliveryBoy
-                                                ? Colors.white
-                                                : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 20),
 
                       // Username Input Field
@@ -330,33 +233,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                       // Submit Login Button
                       CustomButton(
-                        label: _selectedRoleTab == UserRole.admin ? 'Login as Admin' : 'Login as Delivery Driver',
+                        label: 'Login',
                         icon: Icons.login_rounded,
                         isLoading: authState.isLoading,
                         onPressed: _handleLogin,
                       ),
 
-                      const SizedBox(height: 16),
 
-                      // Quick Demo Helpers Footer
-                      // Using Wrap so chips flow onto the next line on narrow screens
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          ActionChip(
-                            avatar: const Icon(Icons.admin_panel_settings, size: 14, color: AppColors.primary),
-                            label: const Text('Admin Demo', style: TextStyle(fontSize: 11)),
-                            onPressed: _fillDemoAdmin,
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.delivery_dining, size: 14, color: AppColors.info),
-                            label: const Text('Driver Demo', style: TextStyle(fontSize: 11)),
-                            onPressed: _fillDemoDriver,
-                          ),
-                        ],
-                      ),
                     ],
                   ), // Column
                 ), // Form

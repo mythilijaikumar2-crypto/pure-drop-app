@@ -26,7 +26,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // 1. Asynchronously initialize Hive storage while Splash is on screen
       await HiveService.init();
 
-      // 2. Seed initial demo data if empty
+      // 2. Clear initial demo data & ensure clean storage state
       await ref.read(appRepositoryProvider).seedInitialDataIfEmpty();
 
       // 3. Re-check saved user session
@@ -56,47 +56,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SizedBox.expand(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Pure Drop Aqua Logo with Smooth Pulsing Animation
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF1DAEFF).withValues(alpha: 0.15),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
-              child: const AppLogo(size: 220),
-            )
-                .animate(onPlay: (controller) => controller.repeat(reverse: true))
-                .scale(
-                  begin: const Offset(0.95, 0.95),
-                  end: const Offset(1.05, 1.05),
-                  duration: 1400.ms,
-                  curve: Curves.easeInOut,
-                ),
-
-            const SizedBox(height: 32),
-
-            // Loading Spinner Indicator
-            const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1DAEFF)),
-              ),
-            ).animate().fadeIn(delay: 400.ms),
-          ],
-        ),
+      body: Center(
+        child: const AppLogo(size: 240)
+            .animate(onPlay: (controller) => controller.repeat(reverse: true))
+            .fadeIn(duration: 500.ms)
+            .scale(
+              begin: const Offset(0.94, 0.94),
+              end: const Offset(1.06, 1.06),
+              duration: 1500.ms,
+              curve: Curves.easeInOut,
+            ),
       ),
     );
   }

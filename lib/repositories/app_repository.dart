@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_enums.dart';
@@ -19,205 +20,85 @@ class AppRepository {
 
   AppRepository(this._dioClient);
 
-  // Initialize and Seed Initial Production Demo Data if empty
+  // Initialize and ensure clean storage state (clears initial demo data once)
   Future<void> seedInitialDataIfEmpty() async {
     try {
-      final customerBox = HiveService.getBoxSafe(AppConstants.customerBoxName);
-      if (customerBox == null) return;
-      if (customerBox.isEmpty) {
-      final initialCustomers = [
-        CustomerModel(
-          id: 'CUST-101',
-          name: 'Blue Star Apartments',
-          phone: '9876543210',
-          address: 'Block A, MG Road, Tech Park Area',
-          canPrice: 35.0,
-          canBalance: 25,
-          pendingDues: 875.0,
-          latitude: 12.9716,
-          longitude: 77.5946,
-        ),
-        CustomerModel(
-          id: 'CUST-102',
-          name: 'Rajesh Sharma (Villa 14)',
-          phone: '9822011223',
-          address: 'Villa 14, Palm Meadows, Whitefield',
-          canPrice: 40.0,
-          canBalance: 4,
-          pendingDues: 0.0,
-          latitude: 12.9698,
-          longitude: 77.7499,
-        ),
-        CustomerModel(
-          id: 'CUST-103',
-          name: 'Zenith Tech Solutions',
-          phone: '9988776655',
-          address: '4th Floor, Innovation Hub, Outer Ring Rd',
-          canPrice: 35.0,
-          canBalance: 30,
-          pendingDues: 1050.0,
-          latitude: 12.9279,
-          longitude: 77.6271,
-        ),
-        CustomerModel(
-          id: 'CUST-104',
-          name: 'Green Cafe & Resto',
-          phone: '9744112233',
-          address: '12th Main, Indiranagar',
-          canPrice: 35.0,
-          canBalance: 12,
-          pendingDues: 420.0,
-          latitude: 12.9784,
-          longitude: 77.6408,
-        ),
+      final settingsBox = HiveService.getBoxSafe(AppConstants.settingsBoxName);
+      final currentSavedUrl = settingsBox?.get('apps_script_url');
+      if (currentSavedUrl == null || currentSavedUrl.toString().contains('placeholder')) {
+        await settingsBox?.put('apps_script_url', AppConstants.defaultAppsScriptUrl);
+      }
+
+      final isCleared = settingsBox?.get('demo_data_cleared_v1', defaultValue: false) ?? false;
+
+      if (!isCleared) {
+        // Clear all initial demo data boxes
+        final boxesToClear = [
+          AppConstants.customerBoxName,
+          AppConstants.orderBoxName,
+          AppConstants.employeeBoxName,
+          AppConstants.expenseBoxName,
+          AppConstants.waterPurchaseBoxName,
+          AppConstants.deliveryBoxName,
+          AppConstants.salaryBoxName,
+          AppConstants.paymentBoxName,
+          AppConstants.inventoryBoxName,
+        ];
+
+        for (final boxName in boxesToClear) {
+          final box = HiveService.getBoxSafe(boxName);
+          if (box != null) {
+            await box.clear();
+          }
+        }
+
+        // Initialize inventory with 0 values
+        final inventoryBox = HiveService.getBoxSafe(AppConstants.inventoryBoxName);
+        if (inventoryBox != null) {
+          final initialInventory = InventoryModel.initial();
+          await inventoryBox.put('current', jsonEncode(initialInventory.toJson()));
+        }
+
+        await settingsBox?.put('demo_data_cleared_v1', true);
+      } else {
+        // Ensure inventory exists
+        final inventoryBox = HiveService.getBoxSafe(AppConstants.inventoryBoxName);
+        if (inventoryBox != null && inventoryBox.isEmpty) {
+          final initialInventory = InventoryModel.initial();
+          await inventoryBox.put('current', jsonEncode(initialInventory.toJson()));
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Explicit method to manually wipe database if needed
+  Future<void> clearAllData() async {
+    try {
+      final boxesToClear = [
+        AppConstants.customerBoxName,
+        AppConstants.orderBoxName,
+        AppConstants.employeeBoxName,
+        AppConstants.expenseBoxName,
+        AppConstants.waterPurchaseBoxName,
+        AppConstants.deliveryBoxName,
+        AppConstants.salaryBoxName,
+        AppConstants.paymentBoxName,
+        AppConstants.inventoryBoxName,
       ];
 
-      for (var c in initialCustomers) {
-        await customerBox.put(c.id, jsonEncode(c.toJson()));
+      for (final boxName in boxesToClear) {
+        final box = HiveService.getBoxSafe(boxName);
+        if (box != null) {
+          await box.clear();
+        }
       }
-    }
 
-    final inventoryBox = HiveService.getBox(AppConstants.inventoryBoxName);
-    if (inventoryBox.isEmpty) {
-      final initialInventory = InventoryModel.initial();
-      await inventoryBox.put('current', jsonEncode(initialInventory.toJson()));
-    }
-
-    final employeeBox = HiveService.getBox(AppConstants.employeeBoxName);
-    if (employeeBox.isEmpty) {
-      final employees = [
-        EmployeeModel(
-          id: 'EMP-01',
-          name: 'Ramesh Kumar',
-          phone: '9876001122',
-          role: UserRole.deliveryBoy,
-          baseSalary: 16000,
-          joiningDate: DateTime(2025, 1, 15),
-        ),
-        EmployeeModel(
-          id: 'EMP-02',
-          name: 'Suresh Patel',
-          phone: '9876003344',
-          role: UserRole.deliveryBoy,
-          baseSalary: 16500,
-          joiningDate: DateTime(2025, 3, 1),
-        ),
-        EmployeeModel(
-          id: 'EMP-03',
-          name: 'Sunil Verma',
-          phone: '9876005566',
-          role: UserRole.admin,
-          baseSalary: 30000,
-          joiningDate: DateTime(2024, 6, 1),
-        ),
-      ];
-      for (var e in employees) {
-        await employeeBox.put(e.id, jsonEncode(e.toJson()));
+      final inventoryBox = HiveService.getBoxSafe(AppConstants.inventoryBoxName);
+      if (inventoryBox != null) {
+        final initialInventory = InventoryModel.initial();
+        await inventoryBox.put('current', jsonEncode(initialInventory.toJson()));
       }
-    }
-
-    final orderBox = HiveService.getBox(AppConstants.orderBoxName);
-    if (orderBox.isEmpty) {
-      final initialOrders = [
-        OrderModel(
-          id: 'ORD-1001',
-          customerId: 'CUST-101',
-          customerName: 'Blue Star Apartments',
-          phone: '9876543210',
-          address: 'Block A, MG Road, Tech Park Area',
-          quantity: 10,
-          unitPrice: 35.0,
-          totalAmount: 350.0,
-          status: OrderStatus.assigned,
-          paymentStatus: PaymentStatus.pending,
-          assignedDriverId: 'EMP-01',
-          assignedDriverName: 'Ramesh Kumar',
-          createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-          notes: 'Deliver before 5 PM to security desk',
-        ),
-        OrderModel(
-          id: 'ORD-1002',
-          customerId: 'CUST-102',
-          customerName: 'Rajesh Sharma (Villa 14)',
-          phone: '9822011223',
-          address: 'Villa 14, Palm Meadows, Whitefield',
-          quantity: 2,
-          unitPrice: 40.0,
-          totalAmount: 80.0,
-          status: OrderStatus.pending,
-          paymentStatus: PaymentStatus.pending,
-          createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-          notes: 'Call before arriving',
-        ),
-        OrderModel(
-          id: 'ORD-1003',
-          customerId: 'CUST-104',
-          customerName: 'Green Cafe & Resto',
-          phone: '9744112233',
-          address: '12th Main, Indiranagar',
-          quantity: 5,
-          unitPrice: 35.0,
-          totalAmount: 175.0,
-          status: OrderStatus.delivered,
-          paymentStatus: PaymentStatus.paid,
-          paymentMode: PaymentMode.upi,
-          assignedDriverId: 'EMP-01',
-          assignedDriverName: 'Ramesh Kumar',
-          createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-          deliveredAt: DateTime.now().subtract(const Duration(hours: 3)),
-          emptyCansCollected: 5,
-          notes: 'Paid via Google Pay UPI',
-        ),
-      ];
-      for (var o in initialOrders) {
-        await orderBox.put(o.id, jsonEncode(o.toJson()));
-      }
-    }
-
-    final expenseBox = HiveService.getBox(AppConstants.expenseBoxName);
-    if (expenseBox.isEmpty) {
-      final initialExpenses = [
-        ExpenseModel(
-          id: 'EXP-501',
-          category: ExpenseCategory.petrol,
-          amount: 500.0,
-          description: 'Auto Van Fuel Refill',
-          spentBy: 'Ramesh Kumar',
-          date: DateTime.now().subtract(const Duration(days: 1)),
-        ),
-        ExpenseModel(
-          id: 'EXP-502',
-          category: ExpenseCategory.tea,
-          amount: 80.0,
-          description: 'Tea & Snacks for drivers',
-          spentBy: 'Admin',
-          date: DateTime.now(),
-        ),
-      ];
-      for (var ex in initialExpenses) {
-        await expenseBox.put(ex.id, jsonEncode(ex.toJson()));
-      }
-    }
-
-    final waterPurchaseBox = HiveService.getBox(AppConstants.waterPurchaseBoxName);
-    if (waterPurchaseBox.isEmpty) {
-      final initialPurchases = [
-        WaterPurchaseModel(
-          id: 'WP-201',
-          plantName: 'Aqua Pure Filtration Plant #2',
-          cansPurchased: 200,
-          costPerCan: 15.0,
-          totalCost: 3000.0,
-          paymentStatus: PaymentStatus.paid,
-          date: DateTime.now().subtract(const Duration(days: 2)),
-          notes: 'Batch 8092, High Quality RO Water',
-        ),
-      ];
-      for (var wp in initialPurchases) {
-        await waterPurchaseBox.put(wp.id, jsonEncode(wp.toJson()));
-      }
-    }
-  } catch (_) {}
+    } catch (_) {}
   }
 
   // --- CUSTOMER MODULE CRUD ---
@@ -233,23 +114,114 @@ class AppRepository {
     }
   }
 
-  Future<void> saveCustomer(CustomerModel customer) async {
+  Future<List<CustomerModel>> fetchCustomers() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('🌐 [API REQ] Fetching live customers from Google Apps Script...');
+      }
+      final response = await _dioClient.getAction('getCustomers');
+
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.customerBoxName);
+          final List<CustomerModel> liveCustomers = [];
+
+          for (final item in dataList) {
+            if (item is Map) {
+              final Map<String, dynamic> jsonMap = Map<String, dynamic>.from(item);
+              final customer = CustomerModel.fromJson(jsonMap);
+              if (customer.id.isNotEmpty && customer.name.isNotEmpty) {
+                liveCustomers.add(customer);
+                await box.put(customer.id, jsonEncode(customer.toJson()));
+              }
+            }
+          }
+
+          if (kDebugMode) {
+            debugPrint('✅ [API SUCCESS] Loaded ${liveCustomers.length} customers from Google Sheets!');
+          }
+          return liveCustomers;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch customers from Google Apps Script: $e');
+      }
+    }
+    return getCustomers();
+  }
+
+  Future<bool> saveCustomer(CustomerModel customer) async {
     final box = HiveService.getBox(AppConstants.customerBoxName);
     final id = customer.id.isEmpty ? 'CUST-${_uuid.v4().substring(0, 5).toUpperCase()}' : customer.id;
     final updatedCustomer = customer.copyWith(id: id);
-    await box.put(id, jsonEncode(updatedCustomer.toJson()));
+
+    if (kDebugMode) {
+      debugPrint('🚀 [API POST] Saving customer "${updatedCustomer.name}" to Google Sheets...');
+    }
 
     try {
-      await _dioClient.postAction('saveCustomer', updatedCustomer.toJson());
-    } catch (_) {}
+      final res = await _dioClient.postAction('saveCustomer', updatedCustomer.toJson());
+
+      final resData = res.data;
+      final isSuccess = res.statusCode == 200 &&
+          (resData is Map ? (resData['success'] == true || resData['status'] == 'success') : true);
+
+      if (isSuccess) {
+        await box.put(id, jsonEncode(updatedCustomer.toJson()));
+        if (kDebugMode) {
+          debugPrint('✅ [SHEETS SYNC SUCCESS] Customer "${updatedCustomer.name}" saved to Google Sheets!');
+        }
+        return true;
+      } else {
+        final msg = resData is Map ? (resData['message'] ?? 'Failed to save customer to Google Sheets') : 'Failed to save customer';
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ [SHEETS SYNC ERROR] saveCustomer failed: $e');
+      }
+      rethrow;
+    }
   }
 
-  Future<void> deleteCustomer(String id) async {
+  Future<bool> deleteCustomer(String id) async {
     final box = HiveService.getBox(AppConstants.customerBoxName);
-    await box.delete(id);
+
+    if (kDebugMode) {
+      debugPrint('🚀 [API POST] Deleting customer "$id" from Google Sheets...');
+    }
+
     try {
-      await _dioClient.postAction('deleteCustomer', {'id': id});
-    } catch (_) {}
+      final res = await _dioClient.postAction('deleteCustomer', {'id': id, 'customerId': id});
+
+      final resData = res.data;
+      final isSuccess = res.statusCode == 200 &&
+          (resData is Map ? (resData['success'] == true || resData['status'] == 'success') : true);
+
+      if (isSuccess) {
+        await box.delete(id);
+        if (kDebugMode) {
+          debugPrint('✅ [SHEETS SYNC SUCCESS] Customer "$id" deleted from Google Sheets!');
+        }
+        return true;
+      } else {
+        final msg = resData is Map ? (resData['message'] ?? 'Failed to delete customer from Google Sheets') : 'Failed to delete customer';
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ [SHEETS SYNC ERROR] deleteCustomer failed: $e');
+      }
+      rethrow;
+    }
   }
 
   // --- ORDER MODULE CRUD ---
@@ -267,18 +239,67 @@ class AppRepository {
     }
   }
 
-  Future<void> createOrder(OrderModel order) async {
+  Future<List<OrderModel>> fetchOrders() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('🌐 [API REQ] Fetching live orders from Google Apps Script...');
+      }
+      final response = await _dioClient.getAction('getOrders');
+
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.orderBoxName);
+          final List<OrderModel> liveOrders = [];
+
+          for (final item in dataList) {
+            if (item is Map) {
+              final Map<String, dynamic> jsonMap = Map<String, dynamic>.from(item);
+              final order = OrderModel.fromJson(jsonMap);
+              if (order.id.isNotEmpty) {
+                liveOrders.add(order);
+                await box.put(order.id, jsonEncode(order.toJson()));
+              }
+            }
+          }
+          liveOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return liveOrders;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch orders from Google Apps Script: $e');
+      }
+    }
+    return getOrders();
+  }
+
+  Future<bool> createOrder(OrderModel order) async {
     final box = HiveService.getBox(AppConstants.orderBoxName);
     final id = order.id.isEmpty ? 'ORD-${1000 + box.length + 1}' : order.id;
     final newOrder = order.copyWith(id: id);
-    await box.put(id, jsonEncode(newOrder.toJson()));
 
     try {
-      await _dioClient.postAction('createOrder', newOrder.toJson());
-    } catch (_) {}
+      final res = await _dioClient.postAction('createOrder', newOrder.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+      if (isSuccess) {
+        await box.put(id, jsonEncode(newOrder.toJson()));
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to create order') : 'Failed to create order');
+    } catch (e) {
+      rethrow;
+    }
   }
 
-  Future<void> updateOrderStatus(
+  Future<bool> updateOrderStatus(
     String orderId,
     OrderStatus status, {
     String? driverId,
@@ -290,7 +311,7 @@ class AppRepository {
   }) async {
     final box = HiveService.getBox(AppConstants.orderBoxName);
     final jsonStr = box.get(orderId);
-    if (jsonStr == null) return;
+    if (jsonStr == null) return false;
 
     final order = OrderModel.fromJson(jsonDecode(jsonStr));
     final updated = order.copyWith(
@@ -304,16 +325,38 @@ class AppRepository {
       deliveredAt: status == OrderStatus.delivered ? DateTime.now() : order.deliveredAt,
     );
 
-    await box.put(orderId, jsonEncode(updated.toJson()));
-
-    // Auto update inventory & customer can balance if delivered
-    if (status == OrderStatus.delivered) {
-      await _onOrderDelivered(updated);
-    }
-
     try {
-      await _dioClient.postAction('updateOrder', updated.toJson());
-    } catch (_) {}
+      final res = await _dioClient.postAction('updateOrder', updated.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+
+      if (isSuccess) {
+        await box.put(orderId, jsonEncode(updated.toJson()));
+        if (status == OrderStatus.delivered) {
+          await _onOrderDelivered(updated);
+        }
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to update order') : 'Failed to update order');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteOrder(String id) async {
+    final box = HiveService.getBox(AppConstants.orderBoxName);
+    try {
+      final res = await _dioClient.postAction('deleteOrder', {'id': id, 'orderId': id});
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+      if (isSuccess) {
+        await box.delete(id);
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to delete order') : 'Failed to delete order');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<void> _onOrderDelivered(OrderModel order) async {
@@ -365,12 +408,49 @@ class AppRepository {
     return InventoryModel.initial();
   }
 
-  Future<void> saveInventory(InventoryModel inventory) async {
-    final box = HiveService.getBox(AppConstants.inventoryBoxName);
-    await box.put('current', jsonEncode(inventory.toJson()));
+  Future<InventoryModel> fetchInventory() async {
     try {
-      await _dioClient.postAction('updateInventory', inventory.toJson());
-    } catch (_) {}
+      final response = await _dioClient.getAction('getInventory');
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List && dataList.isNotEmpty) {
+          final lastItem = dataList.last;
+          if (lastItem is Map) {
+            final inv = InventoryModel.fromJson(Map<String, dynamic>.from(lastItem));
+            final box = HiveService.getBox(AppConstants.inventoryBoxName);
+            await box.put('current', jsonEncode(inv.toJson()));
+            return inv;
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch inventory from Google Apps Script: $e');
+      }
+    }
+    return getInventory();
+  }
+
+  Future<bool> saveInventory(InventoryModel inventory) async {
+    final box = HiveService.getBox(AppConstants.inventoryBoxName);
+    try {
+      final res = await _dioClient.postAction('updateInventory', inventory.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+      if (isSuccess) {
+        await box.put('current', jsonEncode(inventory.toJson()));
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to update inventory') : 'Failed to update inventory');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- WATER PURCHASE CRUD ---
@@ -387,47 +467,75 @@ class AppRepository {
     }
   }
 
-  Future<void> addWaterPurchase(WaterPurchaseModel purchase) async {
+  Future<List<WaterPurchaseModel>> fetchWaterPurchases() async {
+    try {
+      final response = await _dioClient.getAction('getWaterPurchases');
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.waterPurchaseBoxName);
+          final List<WaterPurchaseModel> livePurchases = [];
+          for (final item in dataList) {
+            if (item is Map) {
+              final purchase = WaterPurchaseModel.fromJson(Map<String, dynamic>.from(item));
+              if (purchase.id.isNotEmpty) {
+                livePurchases.add(purchase);
+                await box.put(purchase.id, jsonEncode(purchase.toJson()));
+              }
+            }
+          }
+          livePurchases.sort((a, b) => b.date.compareTo(a.date));
+          return livePurchases;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch water purchases: $e');
+      }
+    }
+    return getWaterPurchases();
+  }
+
+  Future<bool> addWaterPurchase(WaterPurchaseModel purchase) async {
     try {
       final box = HiveService.getBoxSafe(AppConstants.waterPurchaseBoxName);
-      if (box == null) return;
       final id = purchase.id.isEmpty ? 'WP-${_uuid.v4().substring(0, 5).toUpperCase()}' : purchase.id;
-      final item = WaterPurchaseModel(
-        id: id,
-        plantName: purchase.plantName,
-        cansPurchased: purchase.cansPurchased,
-        costPerCan: purchase.costPerCan,
-        totalCost: purchase.totalCost,
-        paymentStatus: purchase.paymentStatus,
-        date: purchase.date,
-        notes: purchase.notes,
-      );
+      final item = purchase.copyWith(id: id);
 
-      await box.put(id, jsonEncode(item.toJson()));
+      final res = await _dioClient.postAction('addWaterPurchase', item.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
 
-      // Automatically increase filled cans inventory
-      final inv = getInventory();
-      final updatedInv = inv.copyWith(
-        filledCans: inv.filledCans + purchase.cansPurchased,
-        totalCans: inv.totalCans + (purchase.notes.contains('New Cans') ? purchase.cansPurchased : 0),
-        lastUpdated: DateTime.now(),
-      );
-      await saveInventory(updatedInv);
+      if (isSuccess) {
+        if (box != null) await box.put(id, jsonEncode(item.toJson()));
+        final inv = getInventory();
+        final updatedInv = inv.copyWith(
+          filledCans: inv.filledCans + purchase.cansPurchased,
+          totalCans: inv.totalCans + (purchase.notes.contains('New Cans') ? purchase.cansPurchased : 0),
+          lastUpdated: DateTime.now(),
+        );
+        await saveInventory(updatedInv);
 
-      // Record expense for water purchase
-      await addExpense(ExpenseModel(
-        id: 'EXP-WP-$id',
-        category: ExpenseCategory.waterPurchase,
-        amount: purchase.totalCost,
-        description: 'Water Purchase batch from ${purchase.plantName} (${purchase.cansPurchased} Cans)',
-        spentBy: 'Admin',
-        date: purchase.date,
-      ));
-
-      try {
-        await _dioClient.postAction('addWaterPurchase', item.toJson());
-      } catch (_) {}
-    } catch (_) {}
+        await addExpense(ExpenseModel(
+          id: 'EXP-WP-$id',
+          category: ExpenseCategory.waterPurchase,
+          amount: purchase.totalCost,
+          description: 'Water Purchase batch from ${purchase.plantName} (${purchase.cansPurchased} Cans)',
+          spentBy: 'Admin',
+          date: purchase.date,
+        ));
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to add water purchase') : 'Failed to add water purchase');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- EMPLOYEES CRUD ---
@@ -442,22 +550,74 @@ class AppRepository {
     }
   }
 
-  Future<void> saveEmployee(EmployeeModel employee) async {
+  Future<List<EmployeeModel>> fetchEmployees() async {
+    try {
+      final response = await _dioClient.getAction('getEmployees');
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.employeeBoxName);
+          final List<EmployeeModel> liveEmployees = [];
+          for (final item in dataList) {
+            if (item is Map) {
+              final emp = EmployeeModel.fromJson(Map<String, dynamic>.from(item));
+              if (emp.id.isNotEmpty) {
+                liveEmployees.add(emp);
+                await box.put(emp.id, jsonEncode(emp.toJson()));
+              }
+            }
+          }
+          return liveEmployees;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch employees: $e');
+      }
+    }
+    return getEmployees();
+  }
+
+  Future<bool> saveEmployee(EmployeeModel employee) async {
     try {
       final box = HiveService.getBoxSafe(AppConstants.employeeBoxName);
-      if (box == null) return;
       final id = employee.id.isEmpty ? 'EMP-${_uuid.v4().substring(0, 4).toUpperCase()}' : employee.id;
-      final emp = EmployeeModel(
-        id: id,
-        name: employee.name,
-        phone: employee.phone,
-        role: employee.role,
- baseSalary: employee.baseSalary,
-        joiningDate: employee.joiningDate,
-        isActive: employee.isActive,
-      );
-      await box.put(id, jsonEncode(emp.toJson()));
-    } catch (_) {}
+      final emp = employee.copyWith(id: id);
+
+      final res = await _dioClient.postAction('saveEmployee', emp.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+
+      if (isSuccess) {
+        if (box != null) await box.put(id, jsonEncode(emp.toJson()));
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to save employee') : 'Failed to save employee');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteEmployee(String id) async {
+    try {
+      final box = HiveService.getBoxSafe(AppConstants.employeeBoxName);
+      final res = await _dioClient.postAction('deleteEmployee', {'id': id, 'employeeId': id});
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+      if (isSuccess) {
+        if (box != null) await box.delete(id);
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to delete employee') : 'Failed to delete employee');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- SALARY CRUD ---
@@ -472,26 +632,14 @@ class AppRepository {
     }
   }
 
-  Future<void> addSalary(SalaryModel salary) async {
+  Future<bool> addSalary(SalaryModel salary) async {
     try {
       final box = HiveService.getBoxSafe(AppConstants.salaryBoxName);
-      if (box == null) return;
       final id = salary.id.isEmpty ? 'SAL-${_uuid.v4().substring(0, 5).toUpperCase()}' : salary.id;
-      final item = SalaryModel(
-        id: id,
-        employeeId: salary.employeeId,
-        employeeName: salary.employeeName,
-        monthYear: salary.monthYear,
-        baseSalary: salary.baseSalary,
-        advances: salary.advances,
-        bonus: salary.bonus,
-        netPayout: salary.netPayout,
-        payoutDate: salary.payoutDate,
-        isPaid: salary.isPaid,
-      );
-      await box.put(id, jsonEncode(item.toJson()));
+      final item = salary.copyWith(id: id);
 
-      // Record as Expense
+      if (box != null) await box.put(id, jsonEncode(item.toJson()));
+
       await addExpense(ExpenseModel(
         id: 'EXP-SAL-$id',
         category: ExpenseCategory.salary,
@@ -500,7 +648,10 @@ class AppRepository {
         spentBy: 'Admin',
         date: salary.payoutDate,
       ));
-    } catch (_) {}
+      return true;
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- EXPENSE MODULE CRUD ---
@@ -517,24 +668,59 @@ class AppRepository {
     }
   }
 
-  Future<void> addExpense(ExpenseModel expense) async {
+  Future<List<ExpenseModel>> fetchExpenses() async {
+    try {
+      final response = await _dioClient.getAction('getExpenses');
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
+
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.expenseBoxName);
+          final List<ExpenseModel> liveExpenses = [];
+          for (final item in dataList) {
+            if (item is Map) {
+              final exp = ExpenseModel.fromJson(Map<String, dynamic>.from(item));
+              if (exp.id.isNotEmpty) {
+                liveExpenses.add(exp);
+                await box.put(exp.id, jsonEncode(exp.toJson()));
+              }
+            }
+          }
+          liveExpenses.sort((a, b) => b.date.compareTo(a.date));
+          return liveExpenses;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch expenses: $e');
+      }
+    }
+    return getExpenses();
+  }
+
+  Future<bool> addExpense(ExpenseModel expense) async {
     try {
       final box = HiveService.getBoxSafe(AppConstants.expenseBoxName);
-      if (box == null) return;
       final id = expense.id.isEmpty ? 'EXP-${_uuid.v4().substring(0, 5).toUpperCase()}' : expense.id;
-      final item = ExpenseModel(
-        id: id,
-        category: expense.category,
-        amount: expense.amount,
-        description: expense.description,
-        spentBy: expense.spentBy,
-        date: expense.date,
-      );
-      await box.put(id, jsonEncode(item.toJson()));
-      try {
-        await _dioClient.postAction('addExpense', item.toJson());
-      } catch (_) {}
-    } catch (_) {}
+      final item = expense.copyWith(id: id);
+
+      final res = await _dioClient.postAction('addExpense', item.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+
+      if (isSuccess) {
+        if (box != null) await box.put(id, jsonEncode(item.toJson()));
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to add expense') : 'Failed to add expense');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // --- PAYMENTS MODULE CRUD ---
@@ -551,38 +737,70 @@ class AppRepository {
     }
   }
 
-  Future<void> recordPayment(PaymentModel payment) async {
+  Future<List<PaymentModel>> fetchPayments() async {
     try {
-      final box = HiveService.getBoxSafe(AppConstants.paymentBoxName);
-      if (box == null) return;
-      final id = payment.id.isEmpty ? 'PAY-${_uuid.v4().substring(0, 5).toUpperCase()}' : payment.id;
-      final item = PaymentModel(
-        id: id,
-        customerId: payment.customerId,
-        customerName: payment.customerName,
-        amount: payment.amount,
-        paymentMode: payment.paymentMode,
-        referenceNo: payment.referenceNo,
-        date: payment.date,
-        notes: payment.notes,
-      );
-      await box.put(id, jsonEncode(item.toJson()));
+      final response = await _dioClient.getAction('getIncome');
+      if (response.data != null) {
+        dynamic dataList;
+        if (response.data is Map && response.data['data'] != null) {
+          dataList = response.data['data'];
+        } else if (response.data is List) {
+          dataList = response.data;
+        }
 
-      // Deduct pending dues from customer record
-      final custBox = HiveService.getBoxSafe(AppConstants.customerBoxName);
-      if (custBox != null) {
-        final custStr = custBox.get(payment.customerId);
-        if (custStr != null) {
-          final cust = CustomerModel.fromJson(jsonDecode(custStr));
-          final updatedDues = (cust.pendingDues - payment.amount).clamp(0.0, 999999.0);
-          final updatedCust = cust.copyWith(pendingDues: updatedDues);
-          await custBox.put(cust.id, jsonEncode(updatedCust.toJson()));
+        if (dataList is List) {
+          final box = HiveService.getBox(AppConstants.paymentBoxName);
+          final List<PaymentModel> livePayments = [];
+          for (final item in dataList) {
+            if (item is Map) {
+              final pay = PaymentModel.fromJson(Map<String, dynamic>.from(item));
+              if (pay.id.isNotEmpty) {
+                livePayments.add(pay);
+                await box.put(pay.id, jsonEncode(pay.toJson()));
+              }
+            }
+          }
+          livePayments.sort((a, b) => b.date.compareTo(a.date));
+          return livePayments;
         }
       }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ [API FETCH ERROR] Could not fetch payments: $e');
+      }
+    }
+    return getPayments();
+  }
 
-      try {
-        await _dioClient.postAction('recordPayment', item.toJson());
-      } catch (_) {}
-    } catch (_) {}
+  Future<bool> recordPayment(PaymentModel payment) async {
+    try {
+      final box = HiveService.getBoxSafe(AppConstants.paymentBoxName);
+      final id = payment.id.isEmpty ? 'PAY-${_uuid.v4().substring(0, 5).toUpperCase()}' : payment.id;
+      final item = payment.copyWith(id: id);
+
+      final res = await _dioClient.postAction('recordPayment', item.toJson());
+      final isSuccess = res.statusCode == 200 &&
+          (res.data is Map ? (res.data['success'] == true || res.data['status'] == 'success') : true);
+
+      if (isSuccess) {
+        if (box != null) await box.put(id, jsonEncode(item.toJson()));
+
+        // Deduct pending dues from customer record
+        final custBox = HiveService.getBoxSafe(AppConstants.customerBoxName);
+        if (custBox != null) {
+          final custStr = custBox.get(payment.customerId);
+          if (custStr != null) {
+            final cust = CustomerModel.fromJson(jsonDecode(custStr));
+            final updatedDues = (cust.pendingDues - payment.amount).clamp(0.0, 999999.0);
+            final updatedCust = cust.copyWith(pendingDues: updatedDues);
+            await custBox.put(cust.id, jsonEncode(updatedCust.toJson()));
+          }
+        }
+        return true;
+      }
+      throw Exception(res.data is Map ? (res.data['message'] ?? 'Failed to record payment') : 'Failed to record payment');
+    } catch (e) {
+      rethrow;
+    }
   }
 }

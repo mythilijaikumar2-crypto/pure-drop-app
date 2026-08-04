@@ -47,4 +47,26 @@ class PaymentModel {
             : DateTime.now(),
         notes: json['notes'] ?? '',
       );
+
+  PaymentModel copyWith({
+    String? id,
+    String? customerId,
+    String? customerName,
+    double? amount,
+    PaymentMode? paymentMode,
+    String? referenceNo,
+    DateTime? date,
+    String? notes,
+  }) {
+    return PaymentModel(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      amount: amount ?? this.amount,
+      paymentMode: paymentMode ?? this.paymentMode,
+      referenceNo: referenceNo ?? this.referenceNo,
+      date: date ?? this.date,
+      notes: notes ?? this.notes,
+    );
+  }
 }

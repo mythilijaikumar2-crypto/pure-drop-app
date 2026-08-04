@@ -24,6 +24,10 @@ class AppFormatters {
     return DateFormat('dd MMM yyyy').format(date);
   }
 
+  static String formatMonthYear(DateTime date) {
+    return DateFormat('MMMM yyyy').format(date);
+  }
+
   static String formatDateTime(DateTime dateTime) {
     return DateFormat('dd MMM yyyy, hh:mm a').format(dateTime);
   }

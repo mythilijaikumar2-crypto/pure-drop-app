@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_enums.dart';
-import '../../core/widgets/app_logo.dart';
 import '../../core/widgets/role_badge.dart';
+import '../../core/widgets/water_ripple_effect.dart';
 import '../../providers/app_providers.dart';
 
 class MainShellScreen extends ConsumerWidget {
@@ -19,47 +18,100 @@ class MainShellScreen extends ConsumerWidget {
     final user = authState.user;
     final isAdmin = user?.role == UserRole.admin;
 
+    final orders = ref.watch(orderProvider);
+    final pendingOrdersCount = orders.where((o) => o.status == OrderStatus.pending).length;
+    final activeDeliveriesCount = orders.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled).length;
+
     final String currentLocation = GoRouterState.of(context).uri.toString();
 
-    // Define navigation items based on role
-    final navItems = isAdmin
-        ? const [
-            _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard', route: '/dashboard'),
-            _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Customers', route: '/customers'),
-            _NavItem(icon: Icons.shopping_bag_outlined, activeIcon: Icons.shopping_bag, label: 'Orders', route: '/orders'),
-            _NavItem(icon: Icons.local_shipping_outlined, activeIcon: Icons.local_shipping, label: 'Delivery', route: '/delivery'),
-            _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Inventory', route: '/inventory'),
-            _NavItem(icon: Icons.water_drop_outlined, activeIcon: Icons.water_drop, label: 'Water Purchase', route: '/water-purchase'),
-            _NavItem(icon: Icons.badge_outlined, activeIcon: Icons.badge, label: 'Employees', route: '/employees'),
-            _NavItem(icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Salary', route: '/salary'),
-            _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Expenses', route: '/expenses'),
-            _NavItem(icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet, label: 'Payments', route: '/payments'),
-            _NavItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart, label: 'Reports', route: '/reports'),
-            _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings', route: '/settings'),
+    // 5 Main Bottom Navigation Tabs according to specification
+    final bottomNavItems = isAdmin
+        ? [
+            const _NavItem(
+              icon: Icons.dashboard_outlined,
+              activeIcon: Icons.dashboard,
+              label: 'Dashboard',
+              route: '/dashboard',
+            ),
+            const _NavItem(
+              icon: Icons.people_outline,
+              activeIcon: Icons.people,
+              label: 'Customers',
+              route: '/customers',
+            ),
+            _NavItem(
+              icon: Icons.inventory_2_outlined,
+              activeIcon: Icons.inventory_2,
+              label: 'Orders',
+              route: '/orders',
+              badgeCount: pendingOrdersCount,
+            ),
+            _NavItem(
+              icon: Icons.local_shipping_outlined,
+              activeIcon: Icons.local_shipping,
+              label: 'Delivery',
+              route: '/delivery',
+              badgeCount: activeDeliveriesCount,
+            ),
+            const _NavItem(
+              icon: Icons.menu,
+              activeIcon: Icons.menu_open,
+              label: 'More',
+              route: '/more',
+            ),
           ]
-        : const [
-            _NavItem(icon: Icons.today_outlined, activeIcon: Icons.today, label: "Today's Deliveries", route: '/delivery'),
-            _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Van Stock', route: '/inventory'),
-            _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Customers', route: '/customers'),
-            _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings', route: '/settings'),
+        : [
+            _NavItem(
+              icon: Icons.inventory_2_outlined,
+              activeIcon: Icons.inventory_2,
+              label: 'Orders',
+              route: '/orders',
+              badgeCount: pendingOrdersCount,
+            ),
+            _NavItem(
+              icon: Icons.local_shipping_outlined,
+              activeIcon: Icons.local_shipping,
+              label: 'Delivery',
+              route: '/delivery',
+              badgeCount: activeDeliveriesCount,
+            ),
+            const _NavItem(
+              icon: Icons.people_outline,
+              activeIcon: Icons.people,
+              label: 'Customers',
+              route: '/customers',
+            ),
+            const _NavItem(
+              icon: Icons.menu,
+              activeIcon: Icons.menu_open,
+              label: 'More',
+              route: '/more',
+            ),
           ];
 
-    final isWideScreen = MediaQuery.of(context).size.width >= 600;
+    final isWideScreen = MediaQuery.of(context).size.width >= 700;
+    final currentIndex = _getSelectedIndex(currentLocation, bottomNavItems);
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
-            const AppLogo(size: 30),
-            const SizedBox(width: 8),
+            Image.asset(
+              'assets/Vector Only.png',
+              width: 42,
+              height: 42,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    AppConstants.appName,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  Text(
+                    isAdmin ? 'Pure Drop Aqua Admin' : 'Pure Drop Aqua Driver',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -115,106 +167,39 @@ class MainShellScreen extends ConsumerWidget {
           ),
         ],
       ),
-      drawer: isWideScreen
-          ? null
-          : Drawer(
-              child: Column(
-                children: [
-                  UserAccountsDrawerHeader(
-                    decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-                    currentAccountPicture: const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.water_drop, color: AppColors.primary, size: 36),
-                    ),
-                    accountName: Text(user?.name ?? 'Pure Drop Aqua', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    accountEmail: Text('Role: ${user?.role.displayName}', style: const TextStyle(color: Colors.white70)),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: navItems.length,
-                      itemBuilder: (context, index) {
-                        final item = navItems[index];
-                        final isSelected = currentLocation == item.route;
-                        return ListTile(
-                          leading: Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                          ),
-                          title: Text(
-                            item.label,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                            ),
-                          ),
-                          selected: isSelected,
-                          selectedTileColor: AppColors.primaryLight.withValues(alpha: 0.5),
-                          onTap: () {
-                            Navigator.pop(context);
-                            context.go(item.route);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: AppColors.error),
-                    title: const Text('Logout', style: TextStyle(color: AppColors.error)),
-                    onTap: () {
-                      ref.read(authProvider.notifier).logout();
-                      context.go('/auth');
-                    },
-                  ),
-                ],
-              ),
-            ),
+      drawer: null,
       body: Row(
         children: [
           if (isWideScreen)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  primary: false,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: IntrinsicHeight(
-                      child: NavigationRail(
-                        selectedIndex: _getSelectedIndex(currentLocation, navItems),
-                        onDestinationSelected: (index) {
-                          context.go(navItems[index].route);
-                        },
-                        labelType: NavigationRailLabelType.all,
-                        destinations: navItems.map((item) {
-                          return NavigationRailDestination(
-                            icon: Icon(item.icon),
-                            selectedIcon: Icon(item.activeIcon, color: AppColors.primary),
-                            label: Text(item.label),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          Expanded(child: child),
-        ],
-      ),
-      bottomNavigationBar: isWideScreen || navItems.length > 5
-          ? null
-          : BottomNavigationBar(
-              currentIndex: _getSelectedIndex(currentLocation, navItems),
-              onTap: (index) => context.go(navItems[index].route),
-              selectedItemColor: AppColors.primary,
-              unselectedItemColor: AppColors.textSecondary,
-              items: navItems.map((item) {
-                return BottomNavigationBarItem(
-                  icon: Icon(item.icon),
-                  activeIcon: Icon(item.activeIcon),
-                  label: item.label,
+            NavigationRail(
+              selectedIndex: currentIndex,
+              onDestinationSelected: (index) => context.go(bottomNavItems[index].route),
+              labelType: NavigationRailLabelType.all,
+              destinations: bottomNavItems.map((item) {
+                Widget iconWidget = Icon(item.icon);
+                Widget selectedIconWidget = Icon(item.activeIcon, color: AppColors.primary);
+
+                if (item.badgeCount > 0) {
+                  iconWidget = Badge.count(count: item.badgeCount, child: iconWidget);
+                  selectedIconWidget = Badge.count(count: item.badgeCount, child: selectedIconWidget);
+                }
+
+                return NavigationRailDestination(
+                  icon: iconWidget,
+                  selectedIcon: selectedIconWidget,
+                  label: Text(item.label),
                 );
               }).toList(),
+            ),
+          Expanded(child: WaterRippleEffect(child: child)),
+        ],
+      ),
+      bottomNavigationBar: isWideScreen
+          ? null
+          : _AnimatedBottomNavBar(
+              selectedIndex: currentIndex,
+              items: bottomNavItems,
+              onTap: (index) => context.go(bottomNavItems[index].route),
             ),
     );
   }
@@ -225,16 +210,123 @@ class MainShellScreen extends ConsumerWidget {
   }
 }
 
+class _AnimatedBottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final List<_NavItem> items;
+  final ValueChanged<int> onTap;
+
+  const _AnimatedBottomNavBar({
+    required this.selectedIndex,
+    required this.items,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.15),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: items.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final isSelected = index == selectedIndex;
+
+          Widget iconWidget = Icon(
+            isSelected ? item.activeIcon : item.icon,
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            size: 22,
+          );
+
+          if (item.badgeCount > 0) {
+            iconWidget = Badge.count(
+              count: item.badgeCount,
+              backgroundColor: AppColors.error,
+              textColor: Colors.white,
+              child: iconWidget,
+            );
+          }
+
+          return Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => onTap(index),
+                borderRadius: BorderRadius.circular(18),
+                splashColor: AppColors.primaryLight.withValues(alpha: 0.3),
+                highlightColor: Colors.transparent,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.fastOutSlowIn,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primaryLight : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedScale(
+                        scale: isSelected ? 1.12 : 1.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutBack,
+                        child: iconWidget,
+                      ),
+                      const SizedBox(height: 4),
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 180),
+                        style: TextStyle(
+                          fontSize: isSelected ? 12 : 11,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                        ),
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
 class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final String route;
+  final int badgeCount;
 
   const _NavItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
     required this.route,
+    this.badgeCount = 0,
   });
 }

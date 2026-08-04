@@ -50,4 +50,30 @@ class SalaryModel {
             : DateTime.now(),
         isPaid: json['isPaid'] ?? true,
       );
+
+  SalaryModel copyWith({
+    String? id,
+    String? employeeId,
+    String? employeeName,
+    String? monthYear,
+    double? baseSalary,
+    double? advances,
+    double? bonus,
+    double? netPayout,
+    DateTime? payoutDate,
+    bool? isPaid,
+  }) {
+    return SalaryModel(
+      id: id ?? this.id,
+      employeeId: employeeId ?? this.employeeId,
+      employeeName: employeeName ?? this.employeeName,
+      monthYear: monthYear ?? this.monthYear,
+      baseSalary: baseSalary ?? this.baseSalary,
+      advances: advances ?? this.advances,
+      bonus: bonus ?? this.bonus,
+      netPayout: netPayout ?? this.netPayout,
+      payoutDate: payoutDate ?? this.payoutDate,
+      isPaid: isPaid ?? this.isPaid,
+    );
+  }
 }

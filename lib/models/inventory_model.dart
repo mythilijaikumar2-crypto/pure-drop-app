@@ -16,11 +16,11 @@ class InventoryModel {
   });
 
   factory InventoryModel.initial() => InventoryModel(
-        totalCans: 500,
-        filledCans: 280,
-        emptyCans: 120,
-        damagedCans: 10,
-        customerBalanceCans: 90,
+        totalCans: 0,
+        filledCans: 0,
+        emptyCans: 0,
+        damagedCans: 0,
+        customerBalanceCans: 0,
         lastUpdated: DateTime.now(),
       );
 
@@ -34,11 +34,11 @@ class InventoryModel {
       };
 
   factory InventoryModel.fromJson(Map<String, dynamic> json) => InventoryModel(
-        totalCans: (json['totalCans'] as num?)?.toInt() ?? 500,
-        filledCans: (json['filledCans'] as num?)?.toInt() ?? 280,
-        emptyCans: (json['emptyCans'] as num?)?.toInt() ?? 120,
-        damagedCans: (json['damagedCans'] as num?)?.toInt() ?? 10,
-        customerBalanceCans: (json['customerBalanceCans'] as num?)?.toInt() ?? 90,
+        totalCans: (json['totalCans'] as num?)?.toInt() ?? 0,
+        filledCans: (json['filledCans'] as num?)?.toInt() ?? 0,
+        emptyCans: (json['emptyCans'] as num?)?.toInt() ?? 0,
+        damagedCans: (json['damagedCans'] as num?)?.toInt() ?? 0,
+        customerBalanceCans: (json['customerBalanceCans'] as num?)?.toInt() ?? 0,
         lastUpdated: json['lastUpdated'] != null
             ? DateTime.parse(json['lastUpdated'])
             : DateTime.now(),

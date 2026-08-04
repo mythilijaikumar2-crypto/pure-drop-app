@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_enums.dart';
 import '../core/network/dio_client.dart';
@@ -120,6 +121,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (authenticatedUser != null) {
       await HiveService.saveData(AppConstants.authBoxName, 'currentUser', authenticatedUser.toJson());
       await HiveService.saveData(AppConstants.authBoxName, 'rememberMe', rememberMe);
+      await HiveService.saveData(AppConstants.authBoxName, 'savedUsername', cleanUsername);
+      await HiveService.saveData(AppConstants.authBoxName, 'savedPassword', cleanPassword);
 
       state = AuthState(
         user: authenticatedUser,
@@ -189,23 +192,69 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 // --- CUSTOMER PROVIDER ---
 class CustomerNotifier extends StateNotifier<List<CustomerModel>> {
   final AppRepository _repo;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   CustomerNotifier(this._repo) : super([]) {
-    refresh();
+    state = _repo.getCustomers();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    _isLoading = true;
+    _errorMessage = null;
+    try {
+      final liveList = await _repo.fetchCustomers();
+      state = liveList;
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+    }
   }
 
   void refresh() {
     state = _repo.getCustomers();
+    fetchLive();
   }
 
-  Future<void> addOrUpdate(CustomerModel customer) async {
-    await _repo.saveCustomer(customer);
-    refresh();
+  Future<bool> addOrUpdate(CustomerModel customer) async {
+    _isLoading = true;
+    _errorMessage = null;
+    try {
+      final success = await _repo.saveCustomer(customer);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+    }
   }
 
-  Future<void> delete(String id) async {
-    await _repo.deleteCustomer(id);
-    refresh();
+  Future<bool> delete(String id) async {
+    _isLoading = true;
+    _errorMessage = null;
+    try {
+      final success = await _repo.deleteCustomer(id);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      _isLoading = false;
+    }
   }
 }
 
@@ -219,21 +268,38 @@ class OrderNotifier extends StateNotifier<List<OrderModel>> {
   final Ref _ref;
 
   OrderNotifier(this._repo, this._ref) : super([]) {
-    refresh();
+    state = _repo.getOrders();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveList = await _repo.fetchOrders();
+      state = liveList;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getOrders();
+    fetchLive();
   }
 
-  Future<void> createOrder(OrderModel order) async {
-    await _repo.createOrder(order);
-    refresh();
-    _ref.read(inventoryProvider.notifier).refresh();
-    _ref.read(customerProvider.notifier).refresh();
+  Future<bool> createOrder(OrderModel order) async {
+    try {
+      final success = await _repo.createOrder(order);
+      if (success) {
+        await fetchLive();
+        _ref.read(inventoryProvider.notifier).refresh();
+        _ref.read(customerProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 
-  Future<void> updateStatus(
+  Future<bool> updateStatus(
     String orderId,
     OrderStatus status, {
     String? driverId,
@@ -243,19 +309,42 @@ class OrderNotifier extends StateNotifier<List<OrderModel>> {
     PaymentStatus? paymentStatus,
     PaymentMode? paymentMode,
   }) async {
-    await _repo.updateOrderStatus(
-      orderId,
-      status,
-      driverId: driverId,
-      driverName: driverName,
-      emptyCansCollected: emptyCansCollected,
-      damagedCansReported: damagedCansReported,
-      paymentStatus: paymentStatus,
-      paymentMode: paymentMode,
-    );
-    refresh();
-    _ref.read(inventoryProvider.notifier).refresh();
-    _ref.read(customerProvider.notifier).refresh();
+    try {
+      final success = await _repo.updateOrderStatus(
+        orderId,
+        status,
+        driverId: driverId,
+        driverName: driverName,
+        emptyCansCollected: emptyCansCollected,
+        damagedCansReported: damagedCansReported,
+        paymentStatus: paymentStatus,
+        paymentMode: paymentMode,
+      );
+      if (success) {
+        await fetchLive();
+        _ref.read(inventoryProvider.notifier).refresh();
+        _ref.read(customerProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteOrder(String id) async {
+    try {
+      final success = await _repo.deleteOrder(id);
+      if (success) {
+        await fetchLive();
+        _ref.read(inventoryProvider.notifier).refresh();
+        _ref.read(customerProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -268,16 +357,33 @@ class InventoryNotifier extends StateNotifier<InventoryModel> {
   final AppRepository _repo;
 
   InventoryNotifier(this._repo) : super(InventoryModel.initial()) {
-    refresh();
+    state = _repo.getInventory();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveInv = await _repo.fetchInventory();
+      state = liveInv;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getInventory();
+    fetchLive();
   }
 
-  Future<void> update(InventoryModel inventory) async {
-    await _repo.saveInventory(inventory);
-    refresh();
+  Future<bool> update(InventoryModel inventory) async {
+    try {
+      final success = await _repo.saveInventory(inventory);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -291,18 +397,35 @@ class WaterPurchaseNotifier extends StateNotifier<List<WaterPurchaseModel>> {
   final Ref _ref;
 
   WaterPurchaseNotifier(this._repo, this._ref) : super([]) {
-    refresh();
+    state = _repo.getWaterPurchases();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveList = await _repo.fetchWaterPurchases();
+      state = liveList;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getWaterPurchases();
+    fetchLive();
   }
 
-  Future<void> addPurchase(WaterPurchaseModel item) async {
-    await _repo.addWaterPurchase(item);
-    refresh();
-    _ref.read(inventoryProvider.notifier).refresh();
-    _ref.read(expenseProvider.notifier).refresh();
+  Future<bool> addPurchase(WaterPurchaseModel item) async {
+    try {
+      final success = await _repo.addWaterPurchase(item);
+      if (success) {
+        await fetchLive();
+        _ref.read(inventoryProvider.notifier).refresh();
+        _ref.read(expenseProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -316,16 +439,46 @@ class EmployeeNotifier extends StateNotifier<List<EmployeeModel>> {
   final AppRepository _repo;
 
   EmployeeNotifier(this._repo) : super([]) {
-    refresh();
+    state = _repo.getEmployees();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveList = await _repo.fetchEmployees();
+      state = liveList;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getEmployees();
+    fetchLive();
   }
 
-  Future<void> save(EmployeeModel employee) async {
-    await _repo.saveEmployee(employee);
-    refresh();
+  Future<bool> save(EmployeeModel employee) async {
+    try {
+      final success = await _repo.saveEmployee(employee);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> delete(String id) async {
+    try {
+      final success = await _repo.deleteEmployee(id);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -339,17 +492,33 @@ class SalaryNotifier extends StateNotifier<List<SalaryModel>> {
   final Ref _ref;
 
   SalaryNotifier(this._repo, this._ref) : super([]) {
-    refresh();
+    state = _repo.getSalaries();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      state = _repo.getSalaries();
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getSalaries();
+    fetchLive();
   }
 
-  Future<void> addSalary(SalaryModel item) async {
-    await _repo.addSalary(item);
-    refresh();
-    _ref.read(expenseProvider.notifier).refresh();
+  Future<bool> addSalary(SalaryModel item) async {
+    try {
+      final success = await _repo.addSalary(item);
+      if (success) {
+        await fetchLive();
+        _ref.read(expenseProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -362,16 +531,33 @@ class ExpenseNotifier extends StateNotifier<List<ExpenseModel>> {
   final AppRepository _repo;
 
   ExpenseNotifier(this._repo) : super([]) {
-    refresh();
+    state = _repo.getExpenses();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveList = await _repo.fetchExpenses();
+      state = liveList;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getExpenses();
+    fetchLive();
   }
 
-  Future<void> addExpense(ExpenseModel expense) async {
-    await _repo.addExpense(expense);
-    refresh();
+  Future<bool> addExpense(ExpenseModel expense) async {
+    try {
+      final success = await _repo.addExpense(expense);
+      if (success) {
+        await fetchLive();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -385,17 +571,34 @@ class PaymentNotifier extends StateNotifier<List<PaymentModel>> {
   final Ref _ref;
 
   PaymentNotifier(this._repo, this._ref) : super([]) {
-    refresh();
+    state = _repo.getPayments();
+    fetchLive();
+  }
+
+  Future<void> fetchLive() async {
+    try {
+      final liveList = await _repo.fetchPayments();
+      state = liveList;
+    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getPayments();
+    fetchLive();
   }
 
-  Future<void> recordPayment(PaymentModel payment) async {
-    await _repo.recordPayment(payment);
-    refresh();
-    _ref.read(customerProvider.notifier).refresh();
+  Future<bool> recordPayment(PaymentModel payment) async {
+    try {
+      final success = await _repo.recordPayment(payment);
+      if (success) {
+        await fetchLive();
+        _ref.read(customerProvider.notifier).refresh();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
   }
 }
 
@@ -403,10 +606,23 @@ final paymentProvider = StateNotifierProvider<PaymentNotifier, List<PaymentModel
   return PaymentNotifier(ref.watch(appRepositoryProvider), ref);
 });
 
+class DailyTrendPoint {
+  final String dayLabel;
+  final double revenue;
+  final double expense;
+
+  DailyTrendPoint({
+    required this.dayLabel,
+    required this.revenue,
+    required this.expense,
+  });
+}
+
 // --- DASHBOARD METRICS PROVIDER ---
 class DashboardMetrics {
   final int todayOrdersCount;
   final double todayRevenue;
+  final double totalIncome;
   final double totalExpenses;
   final double netProfit;
   final int filledCans;
@@ -415,10 +631,12 @@ class DashboardMetrics {
   final int customerBalanceCans;
   final double pendingPaymentsTotal;
   final int completedDeliveriesCount;
+  final List<DailyTrendPoint> dailyTrends;
 
   DashboardMetrics({
     required this.todayOrdersCount,
     required this.todayRevenue,
+    required this.totalIncome,
     required this.totalExpenses,
     required this.netProfit,
     required this.filledCans,
@@ -427,6 +645,7 @@ class DashboardMetrics {
     required this.customerBalanceCans,
     required this.pendingPaymentsTotal,
     required this.completedDeliveriesCount,
+    required this.dailyTrends,
   });
 }
 
@@ -435,16 +654,29 @@ final dashboardMetricsProvider = Provider<DashboardMetrics>((ref) {
   final inventory = ref.watch(inventoryProvider);
   final expenses = ref.watch(expenseProvider);
   final customers = ref.watch(customerProvider);
+  final payments = ref.watch(paymentProvider);
 
   final today = DateTime.now();
   bool isToday(DateTime d) =>
       d.year == today.year && d.month == today.month && d.day == today.day;
 
+  bool isSameDay(DateTime d1, DateTime d2) =>
+      d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+
   final todayOrders = orders.where((o) => isToday(o.createdAt)).toList();
   final completedDeliveries = orders.where((o) => o.status == OrderStatus.delivered).toList();
 
-  final todayRevenue = completedDeliveries.fold<double>(
+  final todayRevenue = completedDeliveries
+      .where((o) => isToday(o.createdAt))
+      .fold<double>(0.0, (sum, item) => sum + item.totalAmount);
+
+  final totalOrderRevenue = completedDeliveries.fold<double>(
       0.0, (sum, item) => sum + item.totalAmount);
+
+  final totalPaymentIncome = payments.fold<double>(
+      0.0, (sum, item) => sum + item.amount);
+
+  final totalIncome = totalOrderRevenue + totalPaymentIncome;
 
   final totalExpenses = expenses.fold<double>(
       0.0, (sum, item) => sum + item.amount);
@@ -452,11 +684,32 @@ final dashboardMetricsProvider = Provider<DashboardMetrics>((ref) {
   final pendingPaymentsTotal = customers.fold<double>(
       0.0, (sum, item) => sum + item.pendingDues);
 
-  final netProfit = todayRevenue - totalExpenses;
+  final netProfit = totalIncome - totalExpenses;
+
+  // Calculate real-time 7 days daily trends
+  final List<DailyTrendPoint> dailyTrends = List.generate(7, (index) {
+    final date = today.subtract(Duration(days: 6 - index));
+    final label = DateFormat('E').format(date);
+
+    final dayRevenue = orders
+        .where((o) => (o.status == OrderStatus.delivered || o.status == OrderStatus.pending) && isSameDay(o.createdAt, date))
+        .fold<double>(0.0, (sum, o) => sum + o.totalAmount);
+
+    final dayExpense = expenses
+        .where((e) => isSameDay(e.date, date))
+        .fold<double>(0.0, (sum, e) => sum + e.amount);
+
+    return DailyTrendPoint(
+      dayLabel: label,
+      revenue: dayRevenue,
+      expense: dayExpense,
+    );
+  });
 
   return DashboardMetrics(
     todayOrdersCount: todayOrders.length,
     todayRevenue: todayRevenue,
+    totalIncome: totalIncome,
     totalExpenses: totalExpenses,
     netProfit: netProfit,
     filledCans: inventory.filledCans,
@@ -465,5 +718,6 @@ final dashboardMetricsProvider = Provider<DashboardMetrics>((ref) {
     customerBalanceCans: inventory.customerBalanceCans,
     pendingPaymentsTotal: pendingPaymentsTotal,
     completedDeliveriesCount: completedDeliveries.length,
+    dailyTrends: dailyTrends,
   );
 });

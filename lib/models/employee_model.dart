@@ -43,4 +43,24 @@ class EmployeeModel {
             : DateTime.now(),
         isActive: json['isActive'] ?? true,
       );
+
+  EmployeeModel copyWith({
+    String? id,
+    String? name,
+    String? phone,
+    UserRole? role,
+    double? baseSalary,
+    DateTime? joiningDate,
+    bool? isActive,
+  }) {
+    return EmployeeModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      baseSalary: baseSalary ?? this.baseSalary,
+      joiningDate: joiningDate ?? this.joiningDate,
+      isActive: isActive ?? this.isActive,
+    );
+  }
 }

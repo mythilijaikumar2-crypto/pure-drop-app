@@ -48,4 +48,26 @@ class WaterPurchaseModel {
             : DateTime.now(),
         notes: json['notes'] ?? '',
       );
+
+  WaterPurchaseModel copyWith({
+    String? id,
+    String? plantName,
+    int? cansPurchased,
+    double? costPerCan,
+    double? totalCost,
+    PaymentStatus? paymentStatus,
+    DateTime? date,
+    String? notes,
+  }) {
+    return WaterPurchaseModel(
+      id: id ?? this.id,
+      plantName: plantName ?? this.plantName,
+      cansPurchased: cansPurchased ?? this.cansPurchased,
+      costPerCan: costPerCan ?? this.costPerCan,
+      totalCost: totalCost ?? this.totalCost,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      date: date ?? this.date,
+      notes: notes ?? this.notes,
+    );
+  }
 }

@@ -2,6 +2,7 @@ class CustomerModel {
   final String id;
   final String name;
   final String phone;
+  final String whatsappNumber;
   final String address;
   final double canPrice;
   final int canBalance; // Cans currently held by customer
@@ -13,6 +14,7 @@ class CustomerModel {
     required this.id,
     required this.name,
     required this.phone,
+    this.whatsappNumber = '',
     required this.address,
     this.canPrice = 35.0,
     this.canBalance = 0,
@@ -25,6 +27,8 @@ class CustomerModel {
         'id': id,
         'name': name,
         'phone': phone,
+        'whatsappNumber': whatsappNumber,
+        'alternativeNumber': whatsappNumber,
         'address': address,
         'canPrice': canPrice,
         'canBalance': canBalance,
@@ -34,13 +38,14 @@ class CustomerModel {
       };
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) => CustomerModel(
-        id: json['id'] ?? '',
-        name: json['name'] ?? '',
-        phone: json['phone'] ?? '',
-        address: json['address'] ?? '',
+        id: json['id'] ?? json['CustomerID'] ?? '',
+        name: json['name'] ?? json['CustomerName'] ?? '',
+        phone: json['phone'] ?? json['MobileNumber'] ?? '',
+        whatsappNumber: json['whatsappNumber'] ?? json['AlternativeNumber'] ?? json['whatsapp'] ?? '',
+        address: json['address'] ?? json['Address'] ?? '',
         canPrice: (json['canPrice'] as num?)?.toDouble() ?? 35.0,
-        canBalance: (json['canBalance'] as num?)?.toInt() ?? 0,
-        pendingDues: (json['pendingDues'] as num?)?.toDouble() ?? 0.0,
+        canBalance: (json['canBalance'] as num?)?.toInt() ?? (json['FilledCanBalance'] as num?)?.toInt() ?? 0,
+        pendingDues: (json['pendingDues'] as num?)?.toDouble() ?? (json['PendingAmount'] as num?)?.toDouble() ?? 0.0,
         latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
         longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
       );
@@ -49,6 +54,7 @@ class CustomerModel {
     String? id,
     String? name,
     String? phone,
+    String? whatsappNumber,
     String? address,
     double? canPrice,
     int? canBalance,
@@ -60,6 +66,7 @@ class CustomerModel {
       id: id ?? this.id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
+      whatsappNumber: whatsappNumber ?? this.whatsappNumber,
       address: address ?? this.address,
       canPrice: canPrice ?? this.canPrice,
       canBalance: canBalance ?? this.canBalance,
