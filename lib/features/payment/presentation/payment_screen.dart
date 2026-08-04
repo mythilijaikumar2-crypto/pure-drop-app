@@ -218,7 +218,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     onButtonPressed: () => _showCollectPaymentDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(paymentProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(paymentProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: payments.length,
                       itemBuilder: (context, index) {

@@ -405,7 +405,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                     onButtonPressed: () => _showCreateOrderDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(orderProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(orderProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {

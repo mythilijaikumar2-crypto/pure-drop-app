@@ -117,7 +117,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final inventory = ref.watch(inventoryProvider);
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(inventoryProvider.notifier).fetchLive(),
+      onRefresh: () async => ref.read(inventoryProvider.notifier).refresh(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),

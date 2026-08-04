@@ -221,7 +221,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                     onButtonPressed: () => _showAddExpenseDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(expenseProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(expenseProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {

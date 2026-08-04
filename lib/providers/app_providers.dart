@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_enums.dart';
-import '../core/network/dio_client.dart';
 import '../core/storage/hive_service.dart';
 import '../models/customer_model.dart';
 import '../models/employee_model.dart';
@@ -17,12 +16,8 @@ import '../models/water_purchase_model.dart';
 import '../repositories/app_repository.dart';
 
 // --- CORE SERVICE PROVIDERS ---
-final dioClientProvider = Provider<DioClient>((ref) {
-  return DioClient();
-});
-
 final appRepositoryProvider = Provider<AppRepository>((ref) {
-  return AppRepository(ref.watch(dioClientProvider));
+  return AppRepository();
 });
 
 // --- AUTH PROVIDER ---
@@ -200,25 +195,10 @@ class CustomerNotifier extends StateNotifier<List<CustomerModel>> {
 
   CustomerNotifier(this._repo) : super([]) {
     state = _repo.getCustomers();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    _isLoading = true;
-    _errorMessage = null;
-    try {
-      final liveList = await _repo.fetchCustomers();
-      state = liveList;
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-    }
   }
 
   void refresh() {
     state = _repo.getCustomers();
-    fetchLive();
   }
 
   Future<bool> addOrUpdate(CustomerModel customer) async {
@@ -227,7 +207,7 @@ class CustomerNotifier extends StateNotifier<List<CustomerModel>> {
     try {
       final success = await _repo.saveCustomer(customer);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -245,7 +225,7 @@ class CustomerNotifier extends StateNotifier<List<CustomerModel>> {
     try {
       final success = await _repo.deleteCustomer(id);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -269,26 +249,17 @@ class OrderNotifier extends StateNotifier<List<OrderModel>> {
 
   OrderNotifier(this._repo, this._ref) : super([]) {
     state = _repo.getOrders();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveList = await _repo.fetchOrders();
-      state = liveList;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getOrders();
-    fetchLive();
   }
 
   Future<bool> createOrder(OrderModel order) async {
     try {
       final success = await _repo.createOrder(order);
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(inventoryProvider.notifier).refresh();
         _ref.read(customerProvider.notifier).refresh();
         return true;
@@ -321,7 +292,7 @@ class OrderNotifier extends StateNotifier<List<OrderModel>> {
         paymentMode: paymentMode,
       );
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(inventoryProvider.notifier).refresh();
         _ref.read(customerProvider.notifier).refresh();
         return true;
@@ -336,7 +307,7 @@ class OrderNotifier extends StateNotifier<List<OrderModel>> {
     try {
       final success = await _repo.deleteOrder(id);
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(inventoryProvider.notifier).refresh();
         _ref.read(customerProvider.notifier).refresh();
         return true;
@@ -358,26 +329,17 @@ class InventoryNotifier extends StateNotifier<InventoryModel> {
 
   InventoryNotifier(this._repo) : super(InventoryModel.initial()) {
     state = _repo.getInventory();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveInv = await _repo.fetchInventory();
-      state = liveInv;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getInventory();
-    fetchLive();
   }
 
   Future<bool> update(InventoryModel inventory) async {
     try {
       final success = await _repo.saveInventory(inventory);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -398,26 +360,17 @@ class WaterPurchaseNotifier extends StateNotifier<List<WaterPurchaseModel>> {
 
   WaterPurchaseNotifier(this._repo, this._ref) : super([]) {
     state = _repo.getWaterPurchases();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveList = await _repo.fetchWaterPurchases();
-      state = liveList;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getWaterPurchases();
-    fetchLive();
   }
 
   Future<bool> addPurchase(WaterPurchaseModel item) async {
     try {
       final success = await _repo.addWaterPurchase(item);
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(inventoryProvider.notifier).refresh();
         _ref.read(expenseProvider.notifier).refresh();
         return true;
@@ -440,26 +393,17 @@ class EmployeeNotifier extends StateNotifier<List<EmployeeModel>> {
 
   EmployeeNotifier(this._repo) : super([]) {
     state = _repo.getEmployees();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveList = await _repo.fetchEmployees();
-      state = liveList;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getEmployees();
-    fetchLive();
   }
 
   Future<bool> save(EmployeeModel employee) async {
     try {
       final success = await _repo.saveEmployee(employee);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -472,7 +416,7 @@ class EmployeeNotifier extends StateNotifier<List<EmployeeModel>> {
     try {
       final success = await _repo.deleteEmployee(id);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -493,25 +437,17 @@ class SalaryNotifier extends StateNotifier<List<SalaryModel>> {
 
   SalaryNotifier(this._repo, this._ref) : super([]) {
     state = _repo.getSalaries();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      state = _repo.getSalaries();
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getSalaries();
-    fetchLive();
   }
 
   Future<bool> addSalary(SalaryModel item) async {
     try {
       final success = await _repo.addSalary(item);
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(expenseProvider.notifier).refresh();
         return true;
       }
@@ -532,26 +468,17 @@ class ExpenseNotifier extends StateNotifier<List<ExpenseModel>> {
 
   ExpenseNotifier(this._repo) : super([]) {
     state = _repo.getExpenses();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveList = await _repo.fetchExpenses();
-      state = liveList;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getExpenses();
-    fetchLive();
   }
 
   Future<bool> addExpense(ExpenseModel expense) async {
     try {
       final success = await _repo.addExpense(expense);
       if (success) {
-        await fetchLive();
+        refresh();
         return true;
       }
       return false;
@@ -572,26 +499,17 @@ class PaymentNotifier extends StateNotifier<List<PaymentModel>> {
 
   PaymentNotifier(this._repo, this._ref) : super([]) {
     state = _repo.getPayments();
-    fetchLive();
-  }
-
-  Future<void> fetchLive() async {
-    try {
-      final liveList = await _repo.fetchPayments();
-      state = liveList;
-    } catch (_) {}
   }
 
   void refresh() {
     state = _repo.getPayments();
-    fetchLive();
   }
 
   Future<bool> recordPayment(PaymentModel payment) async {
     try {
       final success = await _repo.recordPayment(payment);
       if (success) {
-        await fetchLive();
+        refresh();
         _ref.read(customerProvider.notifier).refresh();
         return true;
       }

@@ -202,7 +202,7 @@ class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
                     onButtonPressed: () => _showAddWaterPurchaseDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(waterPurchaseProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(waterPurchaseProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: purchases.length,
                       itemBuilder: (context, index) {

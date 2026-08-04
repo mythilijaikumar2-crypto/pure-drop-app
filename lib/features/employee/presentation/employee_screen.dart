@@ -227,7 +227,7 @@ class _EmployeeScreenState extends ConsumerState<EmployeeScreen> {
                     onButtonPressed: () => _showAddEmployeeDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(employeeProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(employeeProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: employees.length,
                       itemBuilder: (context, index) {

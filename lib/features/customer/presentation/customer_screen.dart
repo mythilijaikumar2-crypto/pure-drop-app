@@ -321,7 +321,7 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
                     onButtonPressed: () => _showAddEditCustomerDialog(),
                   )
                 : RefreshIndicator(
-                    onRefresh: () => ref.read(customerProvider.notifier).fetchLive(),
+                    onRefresh: () async => ref.read(customerProvider.notifier).refresh(),
                     child: ListView.builder(
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
