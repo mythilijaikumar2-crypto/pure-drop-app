@@ -19,6 +19,12 @@ class OrderModel {
   final int emptyCansCollected;
   final int damagedCansReported;
   final String notes;
+  final bool isRecurring;
+  final String recurringFrequency; // Daily, Weekly, Monthly
+  final bool isPriority;
+  final String proofType; // None, OTP, Signature, Photo
+  final String otpCode;
+  final String signatureProofPath;
 
   OrderModel({
     required this.id,
@@ -39,6 +45,12 @@ class OrderModel {
     this.emptyCansCollected = 0,
     this.damagedCansReported = 0,
     this.notes = '',
+    this.isRecurring = false,
+    this.recurringFrequency = 'None',
+    this.isPriority = false,
+    this.proofType = 'OTP',
+    this.otpCode = '',
+    this.signatureProofPath = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -60,6 +72,12 @@ class OrderModel {
         'emptyCansCollected': emptyCansCollected,
         'damagedCansReported': damagedCansReported,
         'notes': notes,
+        'isRecurring': isRecurring,
+        'recurringFrequency': recurringFrequency,
+        'isPriority': isPriority,
+        'proofType': proofType,
+        'otpCode': otpCode,
+        'signatureProofPath': signatureProofPath,
       };
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -122,6 +140,12 @@ class OrderModel {
       emptyCansCollected: (json['emptyCansCollected'] as num?)?.toInt() ?? (json['EmptyReturned'] as num?)?.toInt() ?? 0,
       damagedCansReported: (json['damagedCansReported'] as num?)?.toInt() ?? 0,
       notes: json['notes'] ?? json['Remarks'] ?? '',
+      isRecurring: json['isRecurring'] ?? false,
+      recurringFrequency: json['recurringFrequency'] ?? 'None',
+      isPriority: json['isPriority'] ?? false,
+      proofType: json['proofType'] ?? 'OTP',
+      otpCode: json['otpCode'] ?? '',
+      signatureProofPath: json['signatureProofPath'] ?? '',
     );
   }
 
@@ -144,6 +168,12 @@ class OrderModel {
     int? emptyCansCollected,
     int? damagedCansReported,
     String? notes,
+    bool? isRecurring,
+    String? recurringFrequency,
+    bool? isPriority,
+    String? proofType,
+    String? otpCode,
+    String? signatureProofPath,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -164,6 +194,12 @@ class OrderModel {
       emptyCansCollected: emptyCansCollected ?? this.emptyCansCollected,
       damagedCansReported: damagedCansReported ?? this.damagedCansReported,
       notes: notes ?? this.notes,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringFrequency: recurringFrequency ?? this.recurringFrequency,
+      isPriority: isPriority ?? this.isPriority,
+      proofType: proofType ?? this.proofType,
+      otpCode: otpCode ?? this.otpCode,
+      signatureProofPath: signatureProofPath ?? this.signatureProofPath,
     );
   }
 }

@@ -23,19 +23,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _initializeAppAndNavigate() async {
     try {
-      // 1. Asynchronously initialize Hive storage while Splash is on screen
+      // 1. Initialize Hive storage
       await HiveService.init();
 
-      // 2. Clear initial demo data & ensure clean storage state
+      // 2. Seed initial business data if empty
       await ref.read(appRepositoryProvider).seedInitialDataIfEmpty();
 
-      // 3. Re-check saved user session
-      ref.read(authProvider.notifier).checkSavedSession();
+      // 3. One-time admin bootstrap — creates Firebase Auth account + Firestore
+      //    document for admin if this is the first app launch. Safe to call
+      //    on every launch (checks hasBootstrapped flag in Hive).
+      await ref.read(authServiceProvider).bootstrapAdminIfNeeded();
+
+      // 4. Check Firebase session — MUST be awaited before navigation
+      //    Firebase persists auth tokens automatically; this restores the session.
+      await ref.read(authProvider.notifier).checkSavedSession();
     } catch (e) {
       debugPrint('Splash initialization error: $e');
     }
 
-    // Min splash display time for visual polish
+    // 5. Minimum splash display time for visual polish
     await Future.delayed(const Duration(milliseconds: 1800));
 
     if (!mounted) return;
@@ -51,6 +57,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       context.go('/auth');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

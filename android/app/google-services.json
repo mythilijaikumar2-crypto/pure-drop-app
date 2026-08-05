@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "442124120969",
+    "project_id": "puredropaqua-369f6",
+    "storage_bucket": "puredropaqua-369f6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:442124120969:android:25595d7832a4425112a758",
+        "android_client_info": {
+          "package_name": "com.puredrop.aqua.pure_drop_aqua"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD65UMG769TJMXJkZ7zT2cWtmVaXs6eKgs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

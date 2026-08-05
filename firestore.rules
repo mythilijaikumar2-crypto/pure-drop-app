@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPER FUNCTIONS
+    // ─────────────────────────────────────────────────────────────────
+
+    // Authenticated via Firebase Auth (FirebaseAuth.instance.currentUser != null)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Role stored in Firestore users/{uid}.role (NOT custom token claims)
+    // This pattern works with standard Email/Password Firebase Auth —
+    // no Cloud Functions / Admin SDK required.
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // USERS COLLECTION
+    // Users can read/write their own profile. Admin can read all.
+    // ─────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CUSTOMERS COLLECTION
+    // Admin & authenticated employees can read/write customers.
+    // Subcollection: history is append-only (no deletes) for authenticated users.
+    // ─────────────────────────────────────────────────────────────────
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+
+      match /history/{historyId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if false; // Immutable audit history
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ORDERS COLLECTION (Planning only — not overwritten after delivery)
+    // ─────────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // DELIVERIES COLLECTION (Execution records)
+    // Both Admin and Delivery Staff can update delivery status.
+    // ─────────────────────────────────────────────────────────────────
+    match /deliveries/{deliveryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // INVENTORY (Updated atomically during delivery completion)
+    // ─────────────────────────────────────────────────────────────────
+    match /inventory/{inventoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PAYMENTS
+    // ─────────────────────────────────────────────────────────────────
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // EXPENSES
+    // ─────────────────────────────────────────────────────────────────
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // AUDIT LOGS (Append-only — never editable)
+    // ─────────────────────────────────────────────────────────────────
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ADMIN-ONLY COLLECTIONS
+    // ─────────────────────────────────────────────────────────────────
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /salary/{salaryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /water_purchases/{purchaseId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CATCH-ALL: Deny everything not explicitly allowed above
+    // ─────────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

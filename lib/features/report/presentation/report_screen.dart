@@ -63,7 +63,7 @@ class ReportScreen extends ConsumerWidget {
                 ),
                 pw.Spacer(),
                 pw.Divider(),
-                pw.Center(child: pw.Text('Pure Drop Aqua ERP System - Generated Automatically')),
+                pw.Center(child: pw.Text('Pure Drop Aqua System - Generated Automatically')),
               ],
             ),
           );
@@ -195,19 +195,39 @@ class ReportScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Monthly Revenue vs Expense Comparison', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text('Daily Revenue vs Expense Comparison (Past 7 Days)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 250,
                   child: BarChart(
                     BarChartData(
                       borderData: FlBorderData(show: false),
-                      barGroups: [
-                        BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: 15000, color: AppColors.primary), BarChartRodData(toY: 8000, color: AppColors.error)]),
-                        BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: 18000, color: AppColors.primary), BarChartRodData(toY: 9500, color: AppColors.error)]),
-                        BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: 22000, color: AppColors.primary), BarChartRodData(toY: 11000, color: AppColors.error)]),
-                        BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: 27000, color: AppColors.primary), BarChartRodData(toY: 12500, color: AppColors.error)]),
-                      ],
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final idx = value.toInt();
+                              if (idx >= 0 && idx < metrics.dailyTrends.length) {
+                                return Text(metrics.dailyTrends[idx].dayLabel, style: const TextStyle(fontSize: 11));
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                      ),
+                      barGroups: List.generate(metrics.dailyTrends.length, (i) {
+                        final item = metrics.dailyTrends[i];
+                        return BarChartGroupData(
+                          x: i,
+                          barRods: [
+                            BarChartRodData(toY: item.revenue > 0 ? item.revenue : 50, color: AppColors.primary, width: 12),
+                            BarChartRodData(toY: item.expense > 0 ? item.expense : 30, color: AppColors.error, width: 12),
+                          ],
+                        );
+                      }),
                     ),
                   ),
                 ),

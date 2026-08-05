@@ -40,6 +40,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     bool isSaving = false;
     String? dialogError;
 
+    bool isPriority = false;
+    bool isRecurring = false;
+    String recurringFreq = 'Daily';
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -118,6 +122,35 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isPriority,
+                          onChanged: (val) => setModalState(() => isPriority = val ?? false),
+                        ),
+                        const Text('⚡ Priority Express Order', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isRecurring,
+                          onChanged: (val) => setModalState(() => isRecurring = val ?? false),
+                        ),
+                        const Text('🔄 Recurring Auto-Delivery', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    if (isRecurring) ...[
+                      const SizedBox(height: 4),
+                      DropdownButtonFormField<String>(
+                        initialValue: recurringFreq,
+                        items: ['Daily', 'Weekly', 'Monthly'].map((f) => DropdownMenuItem(value: f, child: Text('$f Subscription'))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setModalState(() => recurringFreq = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     CustomTextField(
                       label: 'Delivery Notes / Address details',
                       controller: notesCtrl,
@@ -155,13 +188,16 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                               totalAmount: qty * price,
                               createdAt: DateTime.now(),
                               notes: notesCtrl.text.trim(),
+                              isPriority: isPriority,
+                              isRecurring: isRecurring,
+                              recurringFrequency: isRecurring ? recurringFreq : 'None',
                             );
                             await ref.read(orderProvider.notifier).createOrder(order);
                             if (context.mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('✅ Order saved to Google Sheets!'),
+                                  content: Text('✅ Order created successfully!'),
                                   backgroundColor: AppColors.success,
                                 ),
                               );
@@ -249,7 +285,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('✅ Assigned to ${selectedDriver.name} on Google Sheets'),
+                              content: Text('✅ Order assigned to ${selectedDriver.name} successfully!'),
                               backgroundColor: AppColors.success,
                             ),
                           );
@@ -283,7 +319,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
           title: const Text('Delete Order'),
-          content: Text('Are you sure you want to delete order "${order.id}"? This will update Google Sheets.'),
+          content: Text('Are you sure you want to delete order "${order.id}"?'),
           actions: [
             TextButton(
               onPressed: isDeleting ? null : () => Navigator.pop(context),
@@ -301,7 +337,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('✅ Order "${order.id}" deleted from Google Sheets!'),
+                              content: Text('✅ Order "${order.id}" deleted successfully!'),
                               backgroundColor: AppColors.success,
                             ),
                           );
@@ -330,10 +366,22 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isAdmin = user?.role == UserRole.admin;
     final orders = ref.watch(orderProvider);
-    final filtered = _statusFilter == null
+
+    final driverOrders = isAdmin
         ? orders
-        : orders.where((o) => o.status == _statusFilter).toList();
+        : orders.where((o) {
+            if (o.assignedDriverId != null && o.assignedDriverId == user?.id) return true;
+            if (o.assignedDriverName != null && user?.name != null && o.assignedDriverName!.toLowerCase().contains(user!.name.toLowerCase())) return true;
+            return false;
+          }).toList();
+
+    final filtered = _statusFilter == null
+        ? driverOrders
+        : driverOrders.where((o) => o.status == _statusFilter).toList();
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -370,12 +418,14 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CustomButton(
-                      label: 'New Order',
-                      icon: Icons.add_shopping_cart,
-                      onPressed: () => _showCreateOrderDialog(),
-                    ),
-                    const SizedBox(height: 10),
+                    if (isAdmin) ...[
+                      CustomButton(
+                        label: 'New Order',
+                        icon: Icons.add_shopping_cart,
+                        onPressed: () => _showCreateOrderDialog(),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     filterRow,
                   ],
                 );
@@ -384,13 +434,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
               return Row(
                 children: [
                   Expanded(child: filterRow),
-                  const SizedBox(width: 12),
-                  CustomButton(
-                    label: 'New Order',
-                    icon: Icons.add_shopping_cart,
-                    width: 140,
-                    onPressed: () => _showCreateOrderDialog(),
-                  ),
+                  if (isAdmin) ...[
+                    const SizedBox(width: 12),
+                    CustomButton(
+                      label: 'New Order',
+                      icon: Icons.add_shopping_cart,
+                      width: 140,
+                      onPressed: () => _showCreateOrderDialog(),
+                    ),
+                  ],
                 ],
               );
             },
@@ -400,9 +452,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             child: filtered.isEmpty
                 ? EmptyStateWidget(
                     title: 'No Orders Found',
-                    description: 'Create a new order to dispatch water cans.',
-                    buttonLabel: 'Create Order',
-                    onButtonPressed: () => _showCreateOrderDialog(),
+                    description: isAdmin ? 'Create a new order to dispatch water cans.' : 'No orders assigned to your route.',
+                    buttonLabel: isAdmin ? 'Create Order' : null,
+                    onButtonPressed: isAdmin ? () => _showCreateOrderDialog() : null,
                   )
                 : RefreshIndicator(
                     onRefresh: () async => ref.read(orderProvider.notifier).refresh(),

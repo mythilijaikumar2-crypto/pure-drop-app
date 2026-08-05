@@ -85,7 +85,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('✅ Expense saved to Google Sheets!'),
+                                  content: Text('✅ Expense logged successfully!'),
                                   backgroundColor: AppColors.success,
                                 ),
                               );
@@ -116,10 +116,18 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isAdmin = user?.role == UserRole.admin;
     final expenses = ref.watch(expenseProvider);
-    final filtered = _categoryFilter == null
+
+    final userExpenses = isAdmin
         ? expenses
-        : expenses.where((e) => e.category == _categoryFilter).toList();
+        : expenses.where((e) => e.spentBy.toLowerCase().contains((user?.name ?? '').toLowerCase()) || e.category == ExpenseCategory.petrol || e.category == ExpenseCategory.vehicleService || e.category == ExpenseCategory.maintenance).toList();
+
+    final filtered = _categoryFilter == null
+        ? userExpenses
+        : userExpenses.where((e) => e.category == _categoryFilter).toList();
 
     final totalAmount = filtered.fold<double>(0.0, (sum, item) => sum + item.amount);
 

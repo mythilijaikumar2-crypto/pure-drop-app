@@ -112,7 +112,7 @@ class _WaterPurchaseScreenState extends ConsumerState<WaterPurchaseScreen> {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('✅ Water purchase saved to Google Sheets!'),
+                                  content: Text('✅ Water purchase batch logged successfully!'),
                                   backgroundColor: AppColors.success,
                                 ),
                               );

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_enums.dart';
 import '../../../core/utils/formatters.dart';
@@ -19,6 +22,75 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
+  void _printReceipt(PaymentModel payment) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a5,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    'PURE DROP AQUA',
+                    style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+                  ),
+                ),
+                pw.Center(
+                  child: pw.Text('Packaged Drinking Water Delivery System', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                ),
+                pw.SizedBox(height: 16),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('RECEIPT #${payment.id}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text(AppFormatters.formatDateTime(payment.date)),
+                  ],
+                ),
+                pw.SizedBox(height: 12),
+                pw.Text('Received From: ${payment.customerName}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 8),
+                pw.Text('Payment Mode: ${payment.paymentMode.displayName}'),
+                if (payment.referenceNo.isNotEmpty) ...[
+                  pw.SizedBox(height: 4),
+                  pw.Text('Transaction / Ref No: ${payment.referenceNo}'),
+                ],
+                pw.SizedBox(height: 16),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(12),
+                  decoration: pw.BoxDecoration(color: PdfColors.grey200, borderRadius: pw.BorderRadius.circular(6)),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('AMOUNT COLLECTED:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                      pw.Text(AppFormatters.formatCurrency(payment.amount), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.green900)),
+                    ],
+                  ),
+                ),
+                pw.Spacer(),
+                pw.Divider(),
+                pw.Center(
+                  child: pw.Text('Thank you for choosing Pure Drop Aqua!', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'PureDrop_Receipt_${payment.id}.pdf',
+    );
+  }
+
   void _showCollectPaymentDialog() {
     final customers = ref.read(customerProvider);
     final dueCustomers = customers.where((c) => c.pendingDues > 0).toList();
@@ -128,7 +200,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('✅ Payment recorded for ${item.customerName} in Google Sheets!'),
+                                  content: Text('✅ Payment recorded for ${item.customerName} successfully!'),
                                   backgroundColor: AppColors.success,
                                 ),
                               );
@@ -242,9 +314,20 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              trailing: Text(
-                                AppFormatters.formatCurrency(item.amount),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.success),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    AppFormatters.formatCurrency(item.amount),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.success),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.print_outlined, color: AppColors.primary),
+                                    onPressed: () => _printReceipt(item),
+                                    tooltip: 'Print PDF Receipt',
+                                  ),
+                                ],
                               ),
                             ),
                           ),

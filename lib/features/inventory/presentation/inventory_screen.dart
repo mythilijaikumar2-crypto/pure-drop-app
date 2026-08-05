@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_enums.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_card.dart';
@@ -84,7 +85,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('✅ Inventory audit saved to Google Sheets!'),
+                                content: Text('✅ Inventory stock audit saved successfully!'),
                                 backgroundColor: AppColors.success,
                               ),
                             );
@@ -114,6 +115,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final isAdmin = authState.user?.role == UserRole.admin;
     final inventory = ref.watch(inventoryProvider);
 
     return RefreshIndicator(
@@ -139,12 +142,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         'Last updated: ${AppFormatters.formatDateTime(inventory.lastUpdated)}',
                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                       ),
-                      const SizedBox(height: 12),
-                      CustomButton(
-                        label: 'Stock Audit',
-                        icon: Icons.edit_note,
-                        onPressed: () => _showCanAuditDialog(inventory),
-                      ),
+                      if (isAdmin) ...[
+                        const SizedBox(height: 12),
+                        CustomButton(
+                          label: 'Stock Audit',
+                          icon: Icons.edit_note,
+                          onPressed: () => _showCanAuditDialog(inventory),
+                        ),
+                      ],
                     ],
                   );
                 }
@@ -169,13 +174,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    CustomButton(
-                      label: 'Stock Audit',
-                      icon: Icons.edit_note,
-                      width: 140,
-                      onPressed: () => _showCanAuditDialog(inventory),
-                    ),
+                    if (isAdmin) ...[
+                      const SizedBox(width: 12),
+                      CustomButton(
+                        label: 'Stock Audit',
+                        icon: Icons.edit_note,
+                        width: 140,
+                        onPressed: () => _showCanAuditDialog(inventory),
+                      ),
+                    ],
                   ],
                 );
               },

@@ -94,10 +94,16 @@ class _CustomButtonState extends State<CustomButton> {
       onPointerDown: (_) => setState(() => _isPressed = true),
       onPointerUp: (_) => setState(() => _isPressed = false),
       onPointerCancel: (_) => setState(() => _isPressed = false),
-      child: SizedBox(
-        width: widget.width ?? double.infinity,
-        height: 48,
-        child: content,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final resolvedWidth = widget.width ??
+              (constraints.hasBoundedWidth ? double.infinity : null);
+          return SizedBox(
+            width: resolvedWidth,
+            height: 48,
+            child: content,
+          );
+        },
       ),
     );
   }

@@ -33,22 +33,25 @@ class _CustomCardState extends State<CustomCard> {
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(widget.radius ?? AppConstants.cardRadius);
 
-    Widget content = Container(
-      padding: widget.padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: widget.backgroundColor ?? AppColors.surface,
-        borderRadius: borderRadius,
-        border: widget.border ?? Border.all(color: Colors.grey.withValues(alpha: 0.12), width: 1),
-        boxShadow: widget.boxShadow ??
-            [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: _isPressed ? 0.08 : 0.03),
-                blurRadius: _isPressed ? 14 : 10,
-                offset: _isPressed ? const Offset(0, 6) : const Offset(0, 4),
-              ),
-            ],
+    Widget content = Material(
+      color: widget.backgroundColor ?? AppColors.surface,
+      borderRadius: borderRadius,
+      child: Container(
+        padding: widget.padding ?? const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          border: widget.border ?? Border.all(color: Colors.grey.withValues(alpha: 0.12), width: 1),
+          boxShadow: widget.boxShadow ??
+              [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: _isPressed ? 0.08 : 0.03),
+                  blurRadius: _isPressed ? 14 : 10,
+                  offset: _isPressed ? const Offset(0, 6) : const Offset(0, 4),
+                ),
+              ],
+        ),
+        child: widget.child,
       ),
-      child: widget.child,
     );
 
     if (widget.onTap != null) {
@@ -60,14 +63,10 @@ class _CustomCardState extends State<CustomCard> {
           scale: _isPressed ? 0.98 : 1.0,
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
-          child: Material(
-            color: Colors.transparent,
+          child: InkWell(
             borderRadius: borderRadius,
-            child: InkWell(
-              borderRadius: borderRadius,
-              onTap: widget.onTap,
-              child: content,
-            ),
+            onTap: widget.onTap,
+            child: content,
           ),
         ),
       );

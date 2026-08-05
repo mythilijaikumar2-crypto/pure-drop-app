@@ -327,11 +327,17 @@ class DashboardScreen extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Revenue vs Expense (7 Days)',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        const Expanded(
+                          child: Text(
+                            'Revenue vs Expense (7 Days)',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(width: 8, height: 8, color: AppColors.primary),
                             const SizedBox(width: 4),

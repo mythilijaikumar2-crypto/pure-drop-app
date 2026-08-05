@@ -1,6 +1,6 @@
 class AppConstants {
-  static const String appName = 'Pure Drop Aqua ERP';
-  static const String appTagline = 'Pure Water Distribution ERP';
+  static const String appName = 'Pure Drop Aqua';
+  static const String appTagline = 'Pure Water Distribution';
   static const String currencySymbol = '₹';
   
   // Storage Keys
@@ -12,6 +12,7 @@ class AppConstants {
   static const String deliveryBoxName = 'delivery_box';
   static const String employeeBoxName = 'employee_box';
   static const String salaryBoxName = 'salary_box';
+  static const String attendanceBoxName = 'attendance_box';
   static const String expenseBoxName = 'expense_box';
   static const String paymentBoxName = 'payment_box';
   static const String settingsBoxName = 'settings_box';

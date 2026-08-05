@@ -24,67 +24,72 @@ class EmptyStateWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (lottieUrl != null && lottieUrl!.isNotEmpty)
               SizedBox(
-                height: 140,
-                width: 140,
+                height: 120,
+                width: 120,
                 child: Lottie.network(
                   lottieUrl!,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: const BoxDecoration(
                       color: AppColors.primaryLight,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 48, color: AppColors.primary),
+                    child: Icon(icon, size: 40, color: AppColors.primary),
                   ),
                 ),
               ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack).fadeIn()
             else
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
-                  size: 48,
+                  size: 40,
                   color: AppColors.primary,
                 ),
               ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack).fadeIn(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               description,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
             if (buttonLabel != null && onButtonPressed != null) ...[
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: onButtonPressed,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

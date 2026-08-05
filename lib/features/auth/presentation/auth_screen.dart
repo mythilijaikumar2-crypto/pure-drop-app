@@ -54,8 +54,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).loginWithUsernamePassword(
-            username: _usernameController.text.trim(),
+      final success = await ref.read(authProvider.notifier).loginWithUsernameOrEmployeeId(
+            identifier: _usernameController.text.trim(),
             password: _passwordController.text.trim(),
             rememberMe: _rememberMe,
           );
@@ -87,7 +87,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     }
   }
-
 
   void _showForgotPasswordDialog() {
     showDialog(
@@ -140,115 +139,108 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           ),
           child: Center(
             child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: CustomCard(
-                padding: const EdgeInsets.all(28),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Official Pure Drop Aqua Logo
-                      const AppLogo(size: 230).animate().scale(duration: 400.ms),
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: CustomCard(
+                  padding: const EdgeInsets.all(28),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // App Logo
+                        const AppLogo(size: 230).animate().scale(duration: 400.ms),
+                        const SizedBox(height: 20),
 
-                      const SizedBox(height: 20),
-
-                      // Username Input Field
-                      CustomTextField(
-                        label: 'Username',
-                        hint: 'Enter your ERP username (min 4 chars)',
-                        controller: _usernameController,
-                        prefixIcon: Icons.person_outline,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Username is required';
-                          if (v.trim().length < 4) return 'Username must be at least 4 characters';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Password Input Field with Eye Toggle
-                      CustomTextField(
-                        label: 'Password',
-                        hint: 'Enter password (min 6 chars)',
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        prefixIcon: Icons.lock_outline,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: AppColors.textMuted,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+                        // Username / Employee ID Field
+                        CustomTextField(
+                          label: 'Username / Employee ID',
+                          hint: 'Enter Username or Employee ID (e.g. PDAEMP-001)',
+                          controller: _usernameController,
+                          prefixIcon: Icons.badge_outlined,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Username or Employee ID is required';
+                            return null;
                           },
                         ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Password is required';
-                          if (v.trim().length < 6) return 'Password must be at least 6 characters';
-                          return null;
-                        },
-                      ),
+                        const SizedBox(height: 14),
 
-                      const SizedBox(height: 12),
-
-                      // Remember Me & Forgot Password Row
-                      Row(
-                        children: [
-                          SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              activeColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              onChanged: (val) {
-                                setState(() => _rememberMe = val ?? true);
-                              },
+                        // Password Field
+                        CustomTextField(
+                          label: 'Password',
+                          hint: 'Enter password',
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          prefixIcon: Icons.lock_outline,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: AppColors.textMuted,
+                              size: 20,
                             ),
+                            onPressed: () {
+                              setState(() => _obscurePassword = !_obscurePassword);
+                            },
                           ),
-                          const SizedBox(width: 8),
-                          const Text('Remember Me', style: TextStyle(fontSize: 13)),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: _showForgotPasswordDialog,
-                            style: TextButton.styleFrom(
-                              // Remove excess horizontal padding that causes overflow
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Password is required';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Remember Me & Forgot Password Row
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                activeColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                onChanged: (val) {
+                                  setState(() => _rememberMe = val ?? true);
+                                },
+                              ),
                             ),
-                            child: const Text(
-                              'Forgot Password?',
-                              style: TextStyle(fontSize: 13, color: AppColors.primaryDark),
+                            const SizedBox(width: 8),
+                            const Text('Remember Me', style: TextStyle(fontSize: 13)),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: _showForgotPasswordDialog,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(fontSize: 13, color: AppColors.primaryDark),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
 
-                      const SizedBox(height: 20),
-
-                      // Submit Login Button
-                      CustomButton(
-                        label: 'Login',
-                        icon: Icons.login_rounded,
-                        isLoading: authState.isLoading,
-                        onPressed: _handleLogin,
-                      ),
-
-
-                    ],
-                  ), // Column
-                ), // Form
-              ), // CustomCard
-            ), // ConstrainedBox
-          ), // SingleChildScrollView
-        ), // Center
-      ), // Container
-    ), // SafeArea
+                        // Login Button
+                        CustomButton(
+                          label: 'Login',
+                          icon: Icons.login_rounded,
+                          isLoading: authState.isLoading,
+                          onPressed: _handleLogin,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

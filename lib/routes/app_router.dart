@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../core/constants/app_constants.dart';
+import '../core/constants/app_enums.dart';
+import '../core/storage/hive_service.dart';
+import '../models/user_model.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
+import '../features/customer/presentation/customer_profile_screen.dart';
 import '../features/customer/presentation/customer_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/delivery/presentation/delivery_screen.dart';
@@ -58,6 +63,33 @@ CustomTransitionPage<void> _buildFastShellPage({
 class AppRouter {
   static final router = GoRouter(
     initialLocation: '/splash',
+    redirect: (context, state) {
+      try {
+        final userJson = HiveService.getData(AppConstants.authBoxName, 'currentUser');
+        if (userJson != null) {
+          final Map<String, dynamic> map = Map<String, dynamic>.from(userJson);
+          final user = UserModel.fromJson(map);
+
+          // Enforce RBAC Route Guards for Employee / Delivery Boy Account
+          if (user.role == UserRole.deliveryBoy) {
+            final loc = state.uri.toString();
+            final adminOnlyRoutes = [
+              '/water-purchase',
+              '/employees',
+              '/salary',
+              '/reports',
+              '/settings',
+            ];
+            if (adminOnlyRoutes.any((r) => loc.startsWith(r))) {
+              return '/delivery';
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('AppRouter redirect exception: $e');
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/splash',
@@ -98,6 +130,17 @@ class AppRouter {
               context: context,
               state: state,
               child: const CustomerScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/customer/profile/:id',
+            name: 'customerProfile',
+            pageBuilder: (context, state) => _buildFastShellPage(
+              context: context,
+              state: state,
+              child: CustomerProfileScreen(
+                customerId: state.pathParameters['id'] ?? '',
+              ),
             ),
           ),
           GoRoute(

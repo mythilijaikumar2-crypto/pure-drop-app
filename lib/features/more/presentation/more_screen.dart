@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_enums.dart';
 import '../../../core/widgets/custom_card.dart';
 import '../../../providers/app_providers.dart';
 
@@ -13,6 +14,7 @@ class MoreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final isAdmin = user?.role == UserRole.admin;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -42,7 +44,7 @@ class MoreScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user?.name ?? 'Pure Drop Admin',
+                        user?.name ?? 'Pure Drop Staff',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -51,7 +53,7 @@ class MoreScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Role: ${user?.role.displayName ?? "Administrator"} • ${user?.phone ?? "9876543210"}',
+                        'Role: ${user?.role.displayName ?? "Delivery Personnel"} • ${user?.phone ?? "9876543210"}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -66,103 +68,108 @@ class MoreScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // Business Section
-          _buildSectionHeader('Business', Icons.business_center),
-          _buildMoreSection(context, [
-            _MoreItem(
-              title: 'Dashboard',
-              subtitle: 'Business analytics & KPIs',
-              icon: Icons.dashboard_outlined,
-              iconColor: AppColors.primary,
-              route: '/dashboard',
-            ),
-            _MoreItem(
-              title: 'Reports',
-              subtitle: 'Sales, expense & inventory reports',
-              icon: Icons.bar_chart_outlined,
-              iconColor: AppColors.success,
-              route: '/reports',
-            ),
-          ]),
-
-          const SizedBox(height: 20),
+          // Business Section (Admin Only)
+          if (isAdmin) ...[
+            _buildSectionHeader('Business', Icons.business_center),
+            _buildMoreSection(context, [
+              const _MoreItem(
+                title: 'Dashboard',
+                subtitle: 'Business analytics & financial KPIs',
+                icon: Icons.dashboard_outlined,
+                iconColor: AppColors.primary,
+                route: '/dashboard',
+              ),
+              const _MoreItem(
+                title: 'Reports',
+                subtitle: 'Sales, expense & P&L reports',
+                icon: Icons.bar_chart_outlined,
+                iconColor: AppColors.success,
+                route: '/reports',
+              ),
+            ]),
+            const SizedBox(height: 20),
+          ],
 
           // Inventory Section
-          _buildSectionHeader('Inventory', Icons.inventory_2),
+          _buildSectionHeader('Inventory & Can Stock', Icons.inventory_2),
           _buildMoreSection(context, [
-            _MoreItem(
+            const _MoreItem(
               title: 'Inventory Stock',
-              subtitle: 'Filled, empty & damaged cans',
+              subtitle: 'Filled, empty & customer cans count',
               icon: Icons.inventory_2_outlined,
               iconColor: AppColors.filledCans,
               route: '/inventory',
             ),
-            _MoreItem(
-              title: 'Water Purchase',
-              subtitle: 'Supplier purchases & invoices',
-              icon: Icons.water_drop_outlined,
-              iconColor: AppColors.primaryDark,
-              route: '/water-purchase',
-            ),
+            if (isAdmin)
+              const _MoreItem(
+                title: 'Water Purchase',
+                subtitle: 'Supplier purchases & invoices',
+                icon: Icons.water_drop_outlined,
+                iconColor: AppColors.primaryDark,
+                route: '/water-purchase',
+              ),
           ]),
 
           const SizedBox(height: 20),
 
           // Finance Section
-          _buildSectionHeader('Finance', Icons.account_balance_wallet),
+          _buildSectionHeader('Finance & Expenses', Icons.account_balance_wallet),
           _buildMoreSection(context, [
-            _MoreItem(
+            const _MoreItem(
               title: 'Income & Payments',
               subtitle: 'Customer payments & collections',
               icon: Icons.payments_outlined,
               iconColor: AppColors.success,
               route: '/payments',
             ),
-            _MoreItem(
-              title: 'Expenses',
-              subtitle: 'Log operating & fuel expenses',
+            const _MoreItem(
+              title: 'Delivery Expenses',
+              subtitle: 'Log fuel & route expenses',
               icon: Icons.receipt_long_outlined,
               iconColor: AppColors.error,
               route: '/expenses',
             ),
-            _MoreItem(
-              title: 'Salary',
-              subtitle: 'Staff payroll & monthly salaries',
-              icon: Icons.badge_outlined,
-              iconColor: AppColors.warning,
-              route: '/salary',
-            ),
+            if (isAdmin)
+              const _MoreItem(
+                title: 'Salary Payroll',
+                subtitle: 'Staff payroll & monthly salaries',
+                icon: Icons.badge_outlined,
+                iconColor: AppColors.warning,
+                route: '/salary',
+              ),
           ]),
 
           const SizedBox(height: 20),
 
-          // Staff Section
-          _buildSectionHeader('Staff & HR', Icons.groups),
-          _buildMoreSection(context, [
-            _MoreItem(
-              title: 'Employees',
-              subtitle: 'Manage drivers & staff members',
-              icon: Icons.people_outline,
-              iconColor: AppColors.info,
-              route: '/employees',
-            ),
-          ]),
-
-          const SizedBox(height: 20),
+          // Staff Section (Admin Only)
+          if (isAdmin) ...[
+            _buildSectionHeader('Staff & HR', Icons.groups),
+            _buildMoreSection(context, [
+              const _MoreItem(
+                title: 'Employees',
+                subtitle: 'Manage drivers & staff members',
+                icon: Icons.people_outline,
+                iconColor: AppColors.info,
+                route: '/employees',
+              ),
+            ]),
+            const SizedBox(height: 20),
+          ],
 
           // System Section
           _buildSectionHeader('System & Account', Icons.settings),
           _buildMoreSection(context, [
-            _MoreItem(
-              title: 'Settings',
-              subtitle: 'Apps Script URL & system config',
-              icon: Icons.settings_outlined,
-              iconColor: AppColors.textSecondary,
-              route: '/settings',
-            ),
+            if (isAdmin)
+              const _MoreItem(
+                title: 'Settings',
+                subtitle: 'Local storage & Firebase config',
+                icon: Icons.settings_outlined,
+                iconColor: AppColors.textSecondary,
+                route: '/settings',
+              ),
             _MoreItem(
               title: 'Logout',
-              subtitle: 'Sign out of your session',
+              subtitle: 'Sign out of your active session',
               icon: Icons.logout,
               iconColor: AppColors.error,
               onTap: () {

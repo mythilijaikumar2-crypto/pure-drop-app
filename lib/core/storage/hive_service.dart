@@ -115,4 +115,26 @@ class HiveService {
       debugPrint('Hive deleteData error for $boxName: $e');
     }
   }
+
+  static Future<void> clearAllData() async {
+    try {
+      final boxes = [
+        AppConstants.customerBoxName,
+        AppConstants.orderBoxName,
+        AppConstants.inventoryBoxName,
+        AppConstants.waterPurchaseBoxName,
+        AppConstants.deliveryBoxName,
+        AppConstants.employeeBoxName,
+        AppConstants.salaryBoxName,
+        AppConstants.expenseBoxName,
+        AppConstants.paymentBoxName,
+      ];
+      for (final b in boxes) {
+        final box = getBoxSafe(b);
+        if (box != null) await box.clear();
+      }
+    } catch (e) {
+      debugPrint('Hive clearAllData error: $e');
+    }
+  }
 }

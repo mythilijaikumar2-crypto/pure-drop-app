@@ -1,130 +1,219 @@
-# Pure Drop Aqua ERP 💧
+# Pure Drop Aqua 💧
 
-**Pure Drop Aqua** is a comprehensive, modern Water Delivery & Inventory Management System built with **Flutter**, **Riverpod**, and **Hive NoSQL Local Storage**. It is designed specifically for water distribution businesses to manage customers, orders, inventory stock, plant purchases, driver deliveries, employee salaries, and financial analytics efficiently.
-
----
-
-## 🎯 Current Project Status & Completed Features
-
-The application is **fully functional** as an offline-first enterprise app with complete state management using Riverpod.
-
-### ✅ Completed Modules
-
-1. 🔐 **Authentication & Role-Based Access**
-   - Separate access views for **Admin** and **Delivery Boy / Driver**.
-   - Offline session persistence (`remember me`).
-   - Quick role switcher for demo & testing.
-
-2. 📊 **Analytics Dashboard**
-   - Real-time today's orders count, revenue, total income, total expenses, and net profit.
-   - 7-day revenue vs expense trend charts.
-   - Live inventory status overview (Filled, Empty, Damaged, Customer balance cans).
-
-3. 👥 **Customer Management**
-   - Complete CRM: Add, Edit, Filter, and Delete customers.
-   - Live tracking of can balances & pending dues per customer.
-   - One-touch phone call & WhatsApp communication.
-   - Address and route tagging.
-
-4. 📦 **Order Management System**
-   - Create new orders with custom pricing and delivery dates.
-   - Status workflow: `Pending` ➔ `In Transit` ➔ `Delivered` / `Cancelled`.
-   - Driver assignment & delivery dispatching.
-   - Auto-updating inventory stock and customer dues upon delivery completion.
-
-5. 🚚 **Driver Delivery App**
-   - Streamlined interface for delivery personnel.
-   - Mark deliveries as complete, collect empty cans, record damaged cans, and log payments on the spot.
-
-6. 🏬 **Inventory & Can Tracking**
-   - Real-time stock counts: Filled Cans, Empty Cans in Godown, Damaged Cans, and Cans with Customers.
-   - Manual adjustment options for stock auditing.
-
-7. 💧 **Plant Water Purchase Management**
-   - Record bulk water purchases from plant suppliers.
-   - Automatically increments filled can inventory and logs expenses.
-
-8. 💰 **Expense & Payment Management**
-   - Categorized expense tracking (Fuel, Vehicle Maintenance, Plant Water, Rent, Salary, Misc).
-   - Customer payment collection tracking against pending dues.
-
-9. 👷 **Employee & Salary System**
-   - Staff directory with roles (Driver, Helper, Manager).
-   - Monthly salary payout recorder with automatic financial expense entry.
-
-10. ⚙️ **System & Offline Storage**
-    - High-performance **Hive NoSQL local database**.
-    - Complete data reset and database management tools in Settings.
-    - Web & Desktop responsive layout compatibility.
+**Pure Drop Aqua** is an enterprise-grade Water Can Distribution Management System built with **Flutter**, **Riverpod**, **Hive NoSQL Database**, and **Google Firebase Cloud Services**.
 
 ---
 
-## 📋 Requirements Needed From User to Reach 100% Production Launch
+## 🔄 End-to-End System Workflow
 
-To finalize the app for actual business operations and publish it to the Google Play Store / App Store, please provide the following details and requirements:
+```mermaid
+flowchart TD
+    Start([1. Authentication]) --> AuthCheck{Role Check}
+    AuthCheck -->|Admin / Super Admin| AdminDash[Admin Workspace Dashboard]
+    AuthCheck -->|Delivery Boy| DriverDash[Driver Route Dashboard]
 
-### 1️⃣ Branding & Business Details
-- [ ] **High-Resolution Logo**: High quality PNG / SVG logo files for App Icon and Invoices.
-- [ ] **Business Information**: Official Business Name, Phone Numbers, Email, Address, and GSTIN (if applicable for invoices).
-- [ ] **Default Price Rules**: Standard sale price per can (e.g., ₹35) and plant purchase cost per can (e.g., ₹15).
+    subgraph Step 2: Customer Onboarding
+        AdminDash --> AddCust[2. Add / Manage Customer Profile]
+        AddCust --> CustSetup[Set Address, Can Price ₹35, Security Deposit ₹160, Maps Pin]
+    end
 
-### 2️⃣ Cloud Backend & Multi-Device Sync Preference
-Currently, the app works **100% offline on a single device**. If you need multiple devices (e.g., Admin phone + 3 Driver phones) to sync data live over the internet:
-- [ ] **Backend Decision**:
-  - Option A: **Firebase / Supabase** (Recommended for fast real-time cloud sync).
-  - Option B: **Custom REST API / Node.js Backend**.
-- [ ] **Cloud Account Access**: Firebase Project credentials or API Server URL.
+    subgraph Step 3: Plant Water Purchases
+        AdminDash --> PlantPurchase[3. Refill Filled Cans from Plant]
+        PlantPurchase --> UpdateStock[Filled Cans +Qty | Log Plant Purchase Expense]
+    end
 
-### 3️⃣ Integrations (Optional but Recommended)
-- [ ] **WhatsApp & SMS Gateway**: API key (e.g., Fast2SMS / Twilio) if you want automatic SMS/WhatsApp bills sent to customers on delivery.
-- [ ] **Payment Gateway**: Razorpay / PhonePe API credentials or Business UPI QR code to accept online payments.
-- [ ] **Google Maps API Key**: If live GPS route navigation and customer location mapping on Google Maps is required.
+    subgraph Step 4: Order Creation & Dispatch
+        AdminDash --> CreateOrd[4. Create Order / Subscription]
+        CreateOrd --> OrdTypes[Regular / Express Priority ⚡ / Recurring 🔄]
+        OrdTypes --> AssignDriver[Assign Delivery Driver]
+    end
 
-### 4️⃣ Play Store / App Store Deployment Requirements
-- [ ] **Google Play Console Account**: Developer account access for publishing Android APK / AAB.
-- [ ] **App Signing Key**: Keystore details for production release build.
-- [ ] **Privacy Policy URL**: Required by Google Play Store guidelines.
+    subgraph Step 5: Delivery Execution
+        DriverDash --> ViewRoute[5. View Assigned Route]
+        AssignDriver --> ViewRoute
+        ViewRoute --> MapNav[Google Maps Route Navigation]
+        MapNav --> CompleteDel[Complete Delivery & Proof Verification]
+        CompleteDel --> CollectEmpty[Collect Returned Empty Cans & Record Damaged]
+    end
+
+    subgraph Step 6: Automated Ledger & Stock Sync
+        CompleteDel --> AutoSync[6. Automatic System Update]
+        AutoSync --> UpdateInv[Inventory: -Filled Cans, +Empty Cans]
+        AutoSync --> UpdateCustLedger[Customer Ledger: +Active Cans, +Pending Dues, +Empty Cans Pending]
+    end
+
+    subgraph Step 7: Payment & PDF Invoicing
+        AdminDash & DriverDash --> RecordPay[7. Record Payment Collection]
+        RecordPay --> PayModes[Cash / UPI / Bank Transfer]
+        PayModes --> GenPDF[Generate & Print PDF Invoice Receipt]
+        GenPDF --> ClearDues[Deduct Customer Dues]
+    end
+
+    subgraph Step 8: Expenses & HR Payroll
+        AdminDash --> LogExp[8. Log Expenses & Payroll]
+        LogExp --> StaffSalary[Process Staff Salary & Print PDF Payslips]
+    end
+
+    subgraph Step 9: Analytics & Data Export
+        AdminDash --> Analytics[9. Business Analytics & P&L Statement]
+        Analytics --> ExportPDF[Export Executive PDF Summary]
+        Analytics --> ExportCSV[Backup Database to Excel / CSV]
+    end
+```
 
 ---
 
-## 🛠️ How to Run the Project Locally
+## 📜 Complete Step-by-Step Workflow Guide
 
-1. **Prerequisites**: Ensure Flutter SDK (v3.19+ recommended) is installed.
-2. **Clone & Install Dependencies**:
+### 1. 🔐 System Authentication & RBAC
+- **Login Credentials**:
+  - **Admin Access**: User `admin` / Password `admin123` (Full system access across all modules).
+  - **Delivery Staff Access**: User `driver` / Password `driver123` (Route-focused mobile view).
+- **Session Security**: Offline session persistence (`Remember Me`) backed by Hive NoSQL storage with Firebase Auth integration.
+
+### 2. 👥 Customer Management & Security Deposit
+- **Profile Configuration**:
+  - Add customers with name, phone, WhatsApp direct link, address, and **Google Maps Location Coordinates**.
+  - **Security Deposit**: Automatically configured with default **₹160** stored inside customer profile.
+  - Custom water can unit price configuration (default **₹35/can**).
+- **Customer Ledger View**:
+  - 3-Tab interactive drawer showing *Profile & Balance*, *Delivery History*, and *Payment History*.
+  - Real-time balances: **Active Water Cans**, **Empty Cans Pending**, and **Pending Dues**.
+
+### 3. 🏬 Plant Refill & Stock Management
+- **Plant Purchases**:
+  - Log batch refills of filled cans directly from water purification plants.
+  - Automatically updates **Filled Cans Stock** and records purchase cost into the financial expense ledger.
+- **Stock Audit & Alerts**:
+  - Live counts: Filled Cans, Empty Cans in Plant, Damaged Cans, Lost Cans, and Cans with Customers.
+  - Automatic **Low Stock Alert Banner** when filled cans drop below safety threshold.
+
+### 4. 📦 Order Processing & Subscription Dispatch
+- **Order Types**:
+  - **Standard Order**: Immediate or scheduled water can delivery.
+  - **Express Priority Order (⚡)**: Highlighted priority badge for rush deliveries.
+  - **Recurring Subscriptions (🔄)**: Auto-recurring schedules (Daily, Weekly, Monthly).
+- **Driver Dispatch**:
+  - Assign pending orders to specific delivery personnel.
+
+### 5. 🚚 Delivery Execution & Verification
+- **Driver Dispatch Interface**:
+  - Drivers view assigned route orders with direct phone call launcher and one-touch **Google Maps Route Navigation**.
+- **Delivery Proof & Completion**:
+  - Delivery modal supports OTP verification, signature proof, and photo proof.
+  - Records delivered filled cans, returned empty cans, damaged cans, and collected payment mode.
+
+### 6. ⚙️ Automated System Reconciliation
+- Upon marking an order as **Delivered**, the system automatically performs atomic updates across database collections:
+  - **Inventory**: Decreases Filled Cans, increases Empty Cans at plant.
+  - **Customer Profile**: Increments Active Cans held, updates Empty Cans Pending, and adds total amount to Pending Dues.
+
+### 7. 💳 Payment Collection & PDF Invoices
+- **Payment Processing**:
+  - Record payments for water charges or security deposit clearances via Cash, UPI, or Bank Transfer.
+  - Immediately updates customer pending dues balance.
+- **PDF Receipt Generator**:
+  - Embedded engine generates downloadable and printable **A5 PDF Invoice Receipts** via `pdf` & `printing` packages.
+
+### 8. 💸 Expense Management & HR Payroll
+- **Expense Categorization**:
+  - Log operational expenses (Fuel, Vehicle Maintenance, Plant Water, Office Expenses, Tea/Food, Misc).
+- **Employee & Salary Payroll**:
+  - Track employee directory, mark attendance, and calculate monthly salary payouts (Base salary + Incentives - Advances).
+  - Generate printable **PDF Salary Slips**.
+
+### 9. 📈 Executive Analytics & Data Export
+- **Business Dashboard**:
+  - Real-time KPIs: Revenue, Expenses, Net Profit ($$\text{Revenue} - \text{Plant Costs} - \text{Expenses} = \text{Net Profit}$$), Pending Dues, Delivered Orders Count.
+  - Interactive 7-day revenue vs expense trend bar chart.
+- **Data Export & Reporting**:
+  - One-click **Executive PDF Summary Report** generation.
+  - Export complete database or individual collections to **Excel / CSV** files.
+
+---
+
+## 🔥 Firebase Integration & Technical Audit Report
+
+### ✅ 1. Features Working Perfectly (Working Status)
+
+| Firebase Feature | Implementation File | Current Working Status |
+| :--- | :--- | :--- |
+| **Firebase Core Initialization** | `main.dart` & `firebase_options.dart` | Initializes cleanly with Firebase Project ID `puredropaqua-369f6`. |
+| **Cloud Firestore Real-time Sync** | `firebase_service.dart` | Atomic background push for all data mutations (`SetOptions(merge: true)`). |
+| **Offline Sync Queue Engine** | `sync_queue_manager.dart` | Queues all offline CRUD operations in Hive NoSQL and automatically pushes to Firestore when connectivity resumes. |
+| **Firestore Security Rules** | `firestore.rules` | Role-based security rules defined for `customers`, `orders`, `deliveries`, `inventory`, `payments`, `expenses`, `employees`, `salary`, `water_purchases`, `settings`. |
+| **Google Authentication** | `auth_service.dart` & `auth_provider.dart` | Google OAuth sign-in flow implemented with silent local fallback session. |
+| **Firebase Storage Service** | `storage_service.dart` | Cloud upload wrapper for bill attachments, signatures, and delivery photo proofs. |
+| **Firebase Cloud Messaging (FCM)** | `notification_service.dart` | Push notification service initialized for background delivery & stock alerts. |
+
+---
+
+### ⚠️ 2. Potential Gotchas, Limitations & Production Checklist
+
+1. **Security Rules Development Fallback Rule**:
+   - **Current Behavior**: `firestore.rules` contains a development fallback rule (`allow read, write: if isAuthenticated() || true;`) on line 89 to prevent local developer blocking when testing offline or without direct Firebase Auth login.
+   - **Production Requirement**: For strict commercial deployment, line 89 should be removed or restricted to `allow read, write: if isAuthenticated();` once all delivery personnel are registered in Firebase Auth.
+
+2. **Offline Multi-Device Conflict Resolution**:
+   - **Current Behavior**: `SyncQueueManager` processes queued offline items sequentially using a "Last-Write-Wins" policy (`SetOptions(merge: true)`).
+   - **Gotcha**: If two users edit the exact same customer or inventory document offline at the same time, the device that syncs last will overwrite the document.
+
+3. **Cloud Firestore Indexing for Complex Compound Queries**:
+   - **Current Behavior**: The app avoids Firestore index errors by loading cached records into Hive and performing fast in-memory Dart filtering.
+   - **Gotcha**: If direct raw Firestore queries with multiple `.where()` and `.orderBy()` clauses are executed via stream listeners instead of in-memory filtering, Composite Indexes must be generated in the Firebase Console.
+
+4. **SHA-1 Fingerprint for Google Sign-In Release Builds**:
+   - **Requirement**: Google Sign-In requires registering your keystore SHA-1 fingerprint in the Firebase Console Android App Settings before deploying production release APKs.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology / Package | Purpose |
+| :--- | :--- | :--- |
+| **Frontend Framework** | [Flutter SDK 3.12+](https://flutter.dev) | Cross-Platform UI (Android & Web Admin) |
+| **State Management** | [Flutter Riverpod 2.5+](https://riverpod.dev) | Reactive state management & business logic |
+| **Offline Database** | [Hive NoSQL 2.2+](https://pub.dev/packages/hive_flutter) | Zero-latency local storage & offline cache |
+| **Cloud Database** | [Cloud Firestore](https://firebase.google.com/docs/firestore) | Real-time multi-device cloud database |
+| **Cloud Auth** | [Firebase Authentication](https://firebase.google.com/docs/auth) | Role-based authentication & route guards |
+| **PDF & Printing** | [Pdf 3.10+](https://pub.dev/packages/pdf) & [Printing 5.13+](https://pub.dev/packages/printing) | PDF Invoice receipts & Executive report export |
+| **Charts** | [FlChart 0.68+](https://pub.dev/packages/fl_chart) | Interactive revenue & expense charts |
+| **Maps & Maps Link** | [Google Maps](https://pub.dev/packages/google_maps_flutter) & [URL Launcher](https://pub.dev/packages/url_launcher) | Route navigation & WhatsApp launcher |
+
+---
+
+## 📂 Codebase Directory Structure
+
+```text
+lib/
+├── core/
+│   ├── constants/       # App colors, enums, business constants
+│   ├── services/        # Firebase Service & Connectivity Sync Queue
+│   ├── storage/        # Hive NoSQL Local Storage Service
+│   ├── theme/          # Material 3 light/dark app theme
+│   ├── utils/          # Result<T> pattern, Date/Currency formatters, validators
+│   └── widgets/        # Reusable cards, buttons, text fields, status badges
+├── models/             # Business Data Models (Customer, Order, Inventory, Expense, Employee, Salary, Payment, Water Purchase)
+├── providers/          # Riverpod state management & dashboard metrics calculations
+├── repositories/       # Clean Architecture Repository pattern (Hive + Firestore Sync)
+├── routes/             # GoRouter navigation & RBAC route guards
+└── features/           # App Modules (Auth, Dashboard, Customer, Order, Delivery, Inventory, Water Purchase, Employee, Salary, Expense, Payment, Report, Settings)
+```
+
+---
+
+## 🚀 Running the Application
+
+1. **Install Dependencies**:
    ```bash
-   git clone https://github.com/mythilijaikumar2-crypto/pure-drop-app.git
-   cd pure-drop-app
    flutter pub get
    ```
-3. **Run on Connected Device**:
+
+2. **Launch Application**:
    ```bash
-   # Run on Chrome Web
+   # Launch Web Admin
    flutter run -d chrome
 
-   # Run on Windows Desktop
-   flutter run -d windows
-
-   # Run on Android Device / Emulator
+   # Launch Android Mobile App
    flutter run -d android
    ```
-
----
-
-## 📂 Project Structure
-```
-lib/
-├── core/              # Design system, theme, widgets, local storage (Hive), constants
-├── models/            # Data models (Customer, Order, Inventory, Expense, Employee, etc.)
-├── providers/         # Riverpod state management & business logic
-├── repositories/      # Offline repository layer (Hive data access)
-├── routes/            # App navigation & router
-└── features/          # App modules (Auth, Dashboard, Customer, Order, Delivery, etc.)
-```
-
----
-
-## 🤝 Next Action Plan
-
-1. **Review this checklist** and let us know which features/integrations you would like to add next.
-2. **Provide branding assets** (Logo & Details) to customize app UI and receipt print templates.
-3. **Decide on Cloud Sync** (keep single-device offline vs. upgrade to multi-device live sync).
