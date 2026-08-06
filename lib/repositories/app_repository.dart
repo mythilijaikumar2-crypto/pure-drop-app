@@ -12,6 +12,7 @@ import '../models/inventory_model.dart';
 import '../models/order_model.dart';
 import '../models/payment_model.dart';
 import '../models/salary_model.dart';
+import '../models/settings_model.dart';
 import '../models/water_purchase_model.dart';
 import '../models/delivery_model.dart';
 import '../models/audit_log_model.dart';
@@ -916,6 +917,33 @@ class AppRepository {
         }
       }
       return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // --- SETTINGS MODULE ---
+  SettingsModel getSettings() {
+    try {
+      final box = HiveService.getBoxSafe(AppConstants.settingsBoxName);
+      if (box != null) {
+        final str = box.get('app_settings');
+        if (str != null) {
+          return SettingsModel.fromJson(jsonDecode(str));
+        }
+      }
+    } catch (_) {}
+    return SettingsModel();
+  }
+
+  Future<bool> saveSettings(SettingsModel settings) async {
+    try {
+      final box = HiveService.getBoxSafe(AppConstants.settingsBoxName);
+      if (box != null) {
+        await box.put('app_settings', jsonEncode(settings.toJson()));
+        return true;
+      }
+      return false;
     } catch (e) {
       rethrow;
     }

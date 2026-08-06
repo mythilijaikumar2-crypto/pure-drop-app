@@ -18,7 +18,7 @@ class DashboardScreen extends ConsumerWidget {
     final metrics = ref.watch(dashboardMetricsProvider);
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isAdmin = user?.role == UserRole.admin;
+    final isAdmin = user?.role == UserRole.admin || user?.role == UserRole.superAdmin;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -325,24 +325,23 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Expanded(
                           child: Text(
                             'Revenue vs Expense (7 Days)',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(width: 8, height: 8, color: AppColors.primary),
                             const SizedBox(width: 4),
                             const Text('Revenue', style: TextStyle(fontSize: 10)),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(width: 8, height: 8, color: AppColors.error),
                             const SizedBox(width: 4),
                             const Text('Expense', style: TextStyle(fontSize: 10)),

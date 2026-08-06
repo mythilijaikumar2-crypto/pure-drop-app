@@ -20,10 +20,12 @@ class OrderModel {
   final int damagedCansReported;
   final String notes;
   final bool isRecurring;
-  final String recurringFrequency; // Daily, Weekly, Monthly
-  final bool isPriority;
-  final String proofType; // None, OTP, Signature, Photo
+  final String recurringFrequency;
+  final OrderPriority priority;
+  final String proofType;
   final String otpCode;
+  final String? deliveryProofUrl;
+  final String? customerSignatureUrl;
   final String signatureProofPath;
 
   OrderModel({
@@ -46,12 +48,16 @@ class OrderModel {
     this.damagedCansReported = 0,
     this.notes = '',
     this.isRecurring = false,
-    this.recurringFrequency = 'None',
-    this.isPriority = false,
+    this.recurringFrequency = 'Daily',
+    this.priority = OrderPriority.normal,
     this.proofType = 'OTP',
-    this.otpCode = '',
+    this.otpCode = '1234',
+    this.deliveryProofUrl,
+    this.customerSignatureUrl,
     this.signatureProofPath = '',
   });
+
+  bool get isPriority => priority == OrderPriority.high || priority == OrderPriority.urgent;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -74,9 +80,11 @@ class OrderModel {
         'notes': notes,
         'isRecurring': isRecurring,
         'recurringFrequency': recurringFrequency,
-        'isPriority': isPriority,
+        'priority': priority.name,
         'proofType': proofType,
         'otpCode': otpCode,
+        'deliveryProofUrl': deliveryProofUrl,
+        'customerSignatureUrl': customerSignatureUrl,
         'signatureProofPath': signatureProofPath,
       };
 
@@ -92,11 +100,15 @@ class OrderModel {
       parsedStatus = OrderStatus.cancelled;
     } else if (statusStr.contains('transit') || statusStr.contains('out')) {
       parsedStatus = OrderStatus.inTransit;
+    } else if (statusStr.contains('assign')) {
+      parsedStatus = OrderStatus.assigned;
     }
 
     PaymentStatus parsedPaymentStatus = PaymentStatus.pending;
     if (paymentStatusStr.contains('paid')) {
       parsedPaymentStatus = PaymentStatus.paid;
+    } else if (paymentStatusStr.contains('part')) {
+      parsedPaymentStatus = PaymentStatus.partiallyPaid;
     }
 
     PaymentMode parsedPaymentMode = PaymentMode.cash;
@@ -141,10 +153,15 @@ class OrderModel {
       damagedCansReported: (json['damagedCansReported'] as num?)?.toInt() ?? 0,
       notes: json['notes'] ?? json['Remarks'] ?? '',
       isRecurring: json['isRecurring'] ?? false,
-      recurringFrequency: json['recurringFrequency'] ?? 'None',
-      isPriority: json['isPriority'] ?? false,
+      recurringFrequency: json['recurringFrequency'] ?? 'Daily',
+      priority: OrderPriority.values.firstWhere(
+        (e) => e.name == json['priority'],
+        orElse: () => (json['isPriority'] == true ? OrderPriority.high : OrderPriority.normal),
+      ),
       proofType: json['proofType'] ?? 'OTP',
-      otpCode: json['otpCode'] ?? '',
+      otpCode: json['otpCode'] ?? '1234',
+      deliveryProofUrl: json['deliveryProofUrl'],
+      customerSignatureUrl: json['customerSignatureUrl'],
       signatureProofPath: json['signatureProofPath'] ?? '',
     );
   }
@@ -170,9 +187,11 @@ class OrderModel {
     String? notes,
     bool? isRecurring,
     String? recurringFrequency,
-    bool? isPriority,
+    OrderPriority? priority,
     String? proofType,
     String? otpCode,
+    String? deliveryProofUrl,
+    String? customerSignatureUrl,
     String? signatureProofPath,
   }) {
     return OrderModel(
@@ -196,9 +215,11 @@ class OrderModel {
       notes: notes ?? this.notes,
       isRecurring: isRecurring ?? this.isRecurring,
       recurringFrequency: recurringFrequency ?? this.recurringFrequency,
-      isPriority: isPriority ?? this.isPriority,
+      priority: priority ?? this.priority,
       proofType: proofType ?? this.proofType,
       otpCode: otpCode ?? this.otpCode,
+      deliveryProofUrl: deliveryProofUrl ?? this.deliveryProofUrl,
+      customerSignatureUrl: customerSignatureUrl ?? this.customerSignatureUrl,
       signatureProofPath: signatureProofPath ?? this.signatureProofPath,
     );
   }

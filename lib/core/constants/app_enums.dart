@@ -1,16 +1,56 @@
 enum UserRole {
+  superAdmin,
   admin,
   deliveryBoy,
-  officeStaff;
+  officeStaff,
+  customer;
 
   String get displayName {
     switch (this) {
+      case UserRole.superAdmin:
+        return 'Super Admin';
       case UserRole.admin:
         return 'Admin';
       case UserRole.deliveryBoy:
         return 'Delivery Boy';
       case UserRole.officeStaff:
         return 'Office Staff';
+      case UserRole.customer:
+        return 'Customer';
+    }
+  }
+}
+
+enum CustomerStatus {
+  active,
+  inactive,
+  blocked;
+
+  String get displayName {
+    switch (this) {
+      case CustomerStatus.active:
+        return 'Active';
+      case CustomerStatus.inactive:
+        return 'Inactive';
+      case CustomerStatus.blocked:
+        return 'Blocked';
+    }
+  }
+}
+
+enum OrderPriority {
+  normal,
+  high,
+  urgent;
+
+  String get displayName {
+    switch (this) {
+      case OrderPriority.normal:
+        return 'Normal';
+      case OrderPriority.high:
+        return 'High Priority';
+      case OrderPriority.urgent:
+        return 'Urgent';
     }
   }
 }

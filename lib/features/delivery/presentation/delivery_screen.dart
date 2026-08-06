@@ -132,6 +132,14 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    CustomTextField(
+                      label: 'Customer OTP Code (Required)',
+                      hint: 'Enter 4-digit OTP (Default: 1234)',
+                      prefixIcon: Icons.lock_outline,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+
                     const Text('Payment Mode Received', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(

@@ -16,6 +16,7 @@ import '../models/order_model.dart';
 import '../models/payment_model.dart';
 import '../models/salary_model.dart';
 import '../models/user_model.dart';
+import '../models/settings_model.dart';
 import '../models/water_purchase_model.dart';
 import '../models/delivery_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -939,3 +940,30 @@ final attendanceProvider = StateNotifierProvider<AttendanceNotifier, List<Attend
   return AttendanceNotifier(ref.watch(attendanceRepositoryProvider));
 });
 
+// --- SETTINGS PROVIDER ---
+class SettingsNotifier extends StateNotifier<SettingsModel> {
+  final AppRepository _repo;
+
+  SettingsNotifier(this._repo) : super(_repo.getSettings());
+
+  void refresh() {
+    state = _repo.getSettings();
+  }
+
+  Future<bool> updateSettings(SettingsModel newSettings) async {
+    try {
+      final success = await _repo.saveSettings(newSettings);
+      if (success) {
+        state = newSettings;
+        return true;
+      }
+      return false;
+    } catch (e) {
+      rethrow;
+    }
+  }
+}
+
+final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsModel>((ref) {
+  return SettingsNotifier(ref.watch(appRepositoryProvider));
+});

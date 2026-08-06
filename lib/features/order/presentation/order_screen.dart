@@ -121,7 +121,6 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Checkbox(
@@ -188,9 +187,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                               totalAmount: qty * price,
                               createdAt: DateTime.now(),
                               notes: notesCtrl.text.trim(),
-                              isPriority: isPriority,
+                              priority: isPriority ? OrderPriority.high : OrderPriority.normal,
                               isRecurring: isRecurring,
                               recurringFrequency: isRecurring ? recurringFreq : 'None',
+                              otpCode: '${1000 + DateTime.now().millisecond % 9000}',
                             );
                             await ref.read(orderProvider.notifier).createOrder(order);
                             if (context.mounted) {

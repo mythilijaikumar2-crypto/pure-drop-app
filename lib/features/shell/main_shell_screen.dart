@@ -16,7 +16,7 @@ class MainShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isAdmin = user?.role == UserRole.admin;
+    final isAdmin = user?.role == UserRole.admin || user?.role == UserRole.superAdmin;
 
     final orders = ref.watch(orderProvider);
     final pendingOrdersCount = orders.where((o) => o.status == OrderStatus.pending).length;

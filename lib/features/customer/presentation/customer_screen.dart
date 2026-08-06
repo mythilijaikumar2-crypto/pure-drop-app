@@ -144,11 +144,17 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  CustomTextField(
-                    label: 'Pending Dues (₹)',
-                    controller: duesCtrl,
-                    keyboardType: TextInputType.number,
-                    validator: (v) => AppValidators.positiveNumber(v, fieldName: 'Dues'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomTextField(
+                          label: 'Pending Dues (₹)',
+                          controller: duesCtrl,
+                          keyboardType: TextInputType.number,
+                          validator: (v) => AppValidators.positiveNumber(v, fieldName: 'Dues'),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   CustomTextField(
@@ -247,7 +253,7 @@ class _CustomerScreenState extends ConsumerState<CustomerScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final isAdmin = authState.user?.role == UserRole.admin;
+    final isAdmin = authState.user?.role == UserRole.admin || authState.user?.role == UserRole.superAdmin;
     final customers = ref.watch(customerProvider);
     final allDeliveries = ref.watch(deliveryProvider);
 

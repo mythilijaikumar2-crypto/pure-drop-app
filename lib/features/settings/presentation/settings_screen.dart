@@ -5,9 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/export_service.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_card.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../../providers/app_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -18,6 +19,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isExporting = false;
+  bool _isClearingData = false;
+  bool _isSavingSettings = false;
 
   String _selectedCollection = 'all';
 
@@ -34,6 +37,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     {'id': 'water_purchases', 'name': 'Water Purchases Collection'},
     {'id': 'settings', 'name': 'Settings Collection'},
   ];
+
+  late TextEditingController _waterPriceCtrl;
+  late TextEditingController _bottlePriceCtrl;
+  late TextEditingController _depositPriceCtrl;
+  late TextEditingController _companyNameCtrl;
+  late TextEditingController _companyPhoneCtrl;
+  late TextEditingController _companyAddressCtrl;
+  late TextEditingController _taxNumberCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = ref.read(settingsProvider);
+    _waterPriceCtrl = TextEditingController(text: settings.defaultWaterPrice.toString());
+    _bottlePriceCtrl = TextEditingController(text: settings.defaultBottlePrice.toString());
+    _depositPriceCtrl = TextEditingController(text: settings.defaultSecurityDeposit.toString());
+    _companyNameCtrl = TextEditingController(text: settings.companyName);
+    _companyPhoneCtrl = TextEditingController(text: settings.companyPhone);
+    _companyAddressCtrl = TextEditingController(text: settings.companyAddress);
+    _taxNumberCtrl = TextEditingController(text: settings.taxNumber);
+  }
+
+  @override
+  void dispose() {
+    _waterPriceCtrl.dispose();
+    _bottlePriceCtrl.dispose();
+    _depositPriceCtrl.dispose();
+    _companyNameCtrl.dispose();
+    _companyPhoneCtrl.dispose();
+    _companyAddressCtrl.dispose();
+    _taxNumberCtrl.dispose();
+    super.dispose();
+  }
+
+  void _saveSettings() async {
+    setState(() => _isSavingSettings = true);
+    final current = ref.read(settingsProvider);
+    final updated = current.copyWith(
+      defaultWaterPrice: double.tryParse(_waterPriceCtrl.text) ?? 35.0,
+      defaultBottlePrice: double.tryParse(_bottlePriceCtrl.text) ?? 150.0,
+      defaultSecurityDeposit: double.tryParse(_depositPriceCtrl.text) ?? 160.0,
+      companyName: _companyNameCtrl.text.trim(),
+      companyPhone: _companyPhoneCtrl.text.trim(),
+      companyAddress: _companyAddressCtrl.text.trim(),
+      taxNumber: _taxNumberCtrl.text.trim(),
+    );
+
+    await ref.read(settingsProvider.notifier).updateSettings(updated);
+    setState(() => _isSavingSettings = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Settings saved successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+  }
 
   void _exportData() async {
     setState(() => _isExporting = true);
@@ -124,6 +186,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  void _clearAllData() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Local Data'),
+        content: const Text(
+          'Are you sure you want to clear all locally stored records? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Clear All', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isClearingData = true);
+      final repo = ref.read(appRepositoryProvider);
+      await repo.clearAllData();
+      ref.invalidate(customerProvider);
+      ref.invalidate(orderProvider);
+      ref.invalidate(inventoryProvider);
+      ref.invalidate(waterPurchaseProvider);
+      ref.invalidate(employeeProvider);
+      ref.invalidate(expenseProvider);
+      ref.invalidate(paymentProvider);
+      setState(() => _isClearingData = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ All data cleared successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -131,7 +238,114 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Employee Management Section (Admin Only)
+          const Text('System Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+
+          // Pricing & Business Configuration Card
+          CustomCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune, color: AppColors.primary, size: 28),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Pricing & Business Configuration',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        label: 'Water Can Price (₹)',
+                        controller: _waterPriceCtrl,
+                        keyboardType: TextInputType.number,
+                        prefixIcon: Icons.water_drop_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CustomTextField(
+                        label: 'Empty Can Price (₹)',
+                        controller: _bottlePriceCtrl,
+                        keyboardType: TextInputType.number,
+                        prefixIcon: Icons.shopping_bag_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                CustomTextField(
+                  label: 'Default Security Deposit (₹)',
+                  controller: _depositPriceCtrl,
+                  keyboardType: TextInputType.number,
+                  prefixIcon: Icons.verified_user_outlined,
+                  hint: 'Default deposit amount per customer profile (₹160)',
+                ),
+                const SizedBox(height: 16),
+
+                const Text('Company Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+
+                CustomTextField(
+                  label: 'Company Name',
+                  controller: _companyNameCtrl,
+                  prefixIcon: Icons.business,
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        label: 'Company Phone',
+                        controller: _companyPhoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        prefixIcon: Icons.phone_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CustomTextField(
+                        label: 'GST / Tax Number',
+                        controller: _taxNumberCtrl,
+                        prefixIcon: Icons.receipt_long,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                CustomTextField(
+                  label: 'Company Address',
+                  controller: _companyAddressCtrl,
+                  maxLines: 2,
+                  prefixIcon: Icons.location_on_outlined,
+                ),
+                const SizedBox(height: 16),
+
+                CustomButton(
+                  label: _isSavingSettings ? 'Saving Settings...' : 'Save Configuration',
+                  icon: Icons.save_rounded,
+                  isLoading: _isSavingSettings,
+                  onPressed: _saveSettings,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Employee Management Link Card
           CustomCard(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -151,7 +365,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Create new employee accounts with auto-generated Employee IDs (PDAEMP-001), manage staff details, search employees, and toggle Active/Inactive statuses.',
+                  'Manage staff profiles, assign delivery roles, and track active employee credentials.',
                   style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 14),
@@ -164,11 +378,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
-          const Text('Admin System & Data Management', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
 
-          // Backup & Storage Status Card
+          // Data Export Card
           CustomCard(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -176,97 +388,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.cloud_done_rounded, color: AppColors.success, size: 28),
+                    Icon(Icons.table_chart, color: AppColors.success, size: 28),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Cloud Sync & Backup Status',
+                        'Excel & CSV Export',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Last Live Sync: ${AppFormatters.formatDateTime(DateTime.now())}',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Firestore Backup Active (puredropaqua-369f6)',
-                        style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Export Firebase Data Card (Excel / CSV)
-          CustomCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.table_chart_rounded, color: AppColors.primary, size: 28),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Export Database (Excel / CSV)',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Export customers, orders, inventory, payments, expenses, employees, and purchases to CSV/Excel format.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 14),
-
-                const Text('Select Collection to Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _selectedCollection,
-                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Select Collection'),
                   items: _collectionsList.map((c) {
-                    return DropdownMenuItem(
-                      value: c['id'],
-                      child: Text(c['name']!),
-                    );
+                    return DropdownMenuItem(value: c['id'], child: Text(c['name']!));
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedCollection = val);
                   },
                 ),
-
                 const SizedBox(height: 16),
                 CustomButton(
-                  label: _isExporting ? 'Generating Export...' : 'Export & Download CSV',
+                  label: _isExporting ? 'Generating Export...' : 'Export Collection Data',
                   icon: Icons.download_rounded,
                   isLoading: _isExporting,
                   onPressed: _exportData,
@@ -275,39 +420,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Import Data Card (Future Feature - Locked)
-          CustomCard(
-            backgroundColor: Colors.grey.shade50,
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Icon(Icons.lock_clock, color: Colors.grey.shade600, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Import Data (Future Release)',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Bulk CSV/Excel importing will be enabled in an upcoming release.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Business Pricing & Rules Configuration Card
+          // Data Wipe Card
           CustomCard(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -315,37 +430,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.tune_rounded, color: AppColors.primary, size: 28),
+                    Icon(Icons.manage_search, color: AppColors.warning, size: 28),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Business Rules & Price Settings',
+                        'Database Reset & Management',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text('Water Can Price (Default): ₹35.00 / can', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                const Text('Security Deposit (Default): ₹160.00 / new customer', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                const Text('Plant Water Purchase Cost: ₹15.00 / filled can', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✅ Business rules & prices updated!'), backgroundColor: AppColors.success),
-                    );
-                  },
-                  icon: const Icon(Icons.check, size: 18),
-                  label: const Text('Save Pricing Configuration'),
+                const Text(
+                  'Clear all locally stored data. This action cannot be undone.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                CustomButton(
+                  label: _isClearingData ? 'Clearing Data...' : 'Clear All Local Data',
+                  icon: Icons.delete_sweep_rounded,
+                  isLoading: _isClearingData,
+                  onPressed: _clearAllData,
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 24),
         ],
       ),
     );
