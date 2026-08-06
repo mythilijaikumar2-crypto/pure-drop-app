@@ -61,12 +61,11 @@ class MainShellScreen extends ConsumerWidget {
             ),
           ]
         : [
-            _NavItem(
-              icon: Icons.inventory_2_outlined,
-              activeIcon: Icons.inventory_2,
-              label: 'Orders',
-              route: '/orders',
-              badgeCount: pendingOrdersCount,
+            const _NavItem(
+              icon: Icons.dashboard_outlined,
+              activeIcon: Icons.dashboard,
+              label: 'Dashboard',
+              route: '/dashboard',
             ),
             _NavItem(
               icon: Icons.local_shipping_outlined,
@@ -74,6 +73,13 @@ class MainShellScreen extends ConsumerWidget {
               label: 'Delivery',
               route: '/delivery',
               badgeCount: activeDeliveriesCount,
+            ),
+            _NavItem(
+              icon: Icons.inventory_2_outlined,
+              activeIcon: Icons.inventory_2,
+              label: 'Orders',
+              route: '/orders',
+              badgeCount: pendingOrdersCount,
             ),
             const _NavItem(
               icon: Icons.people_outline,

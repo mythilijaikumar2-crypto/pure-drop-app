@@ -10,6 +10,7 @@ import '../features/customer/presentation/customer_profile_screen.dart';
 import '../features/customer/presentation/customer_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/delivery/presentation/delivery_screen.dart';
+import '../features/employee/presentation/employee_dashboard_screen.dart';
 import '../features/employee/presentation/employee_screen.dart';
 import '../features/expense/presentation/expense_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
@@ -117,11 +118,23 @@ class AppRouter {
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
-            pageBuilder: (context, state) => _buildFastShellPage(
-              context: context,
-              state: state,
-              child: const DashboardScreen(),
-            ),
+            pageBuilder: (context, state) {
+              bool isEmployee = false;
+              try {
+                final userJson = HiveService.getData(AppConstants.authBoxName, 'currentUser');
+                if (userJson != null) {
+                  final map = Map<String, dynamic>.from(userJson);
+                  final u = UserModel.fromJson(map);
+                  isEmployee = u.role == UserRole.deliveryBoy;
+                }
+              } catch (_) {}
+
+              return _buildFastShellPage(
+                context: context,
+                state: state,
+                child: isEmployee ? const EmployeeDashboardScreen() : const DashboardScreen(),
+              );
+            },
           ),
           GoRoute(
             path: '/customers',

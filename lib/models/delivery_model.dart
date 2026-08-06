@@ -10,6 +10,8 @@ class DeliveryModel {
   final String deliveryStatus; // pending, delivered, cancelled, rescheduled, customerNotAvailable, skipped
   final DateTime deliveryDate;
   final String deliveryTime;
+  final String deliverySlot; // Morning, Evening
+  final String subscriptionType; // Daily, Weekly, Monthly, Custom
   final DateTime? completedAt;
   final DateTime? rescheduledDate;
   final String reason;
@@ -23,6 +25,7 @@ class DeliveryModel {
   final int emptyCansCollected;
   final int damagedCansReported;
   final String paymentMode;
+  final String? previousStateJson; // For 10-second undo state restoration
 
   DeliveryModel({
     required this.deliveryId,
@@ -36,6 +39,8 @@ class DeliveryModel {
     this.deliveryStatus = 'pending',
     required this.deliveryDate,
     this.deliveryTime = '10:00 AM',
+    this.deliverySlot = 'Morning',
+    this.subscriptionType = 'Daily',
     this.completedAt,
     this.rescheduledDate,
     this.reason = '',
@@ -49,6 +54,7 @@ class DeliveryModel {
     this.emptyCansCollected = 0,
     this.damagedCansReported = 0,
     this.paymentMode = 'Cash',
+    this.previousStateJson,
   })  : updatedAt = updatedAt ?? DateTime.now(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -65,6 +71,8 @@ class DeliveryModel {
         'deliveryStatus': deliveryStatus,
         'deliveryDate': deliveryDate.toIso8601String(),
         'deliveryTime': deliveryTime,
+        'deliverySlot': deliverySlot,
+        'subscriptionType': subscriptionType,
         'completedAt': completedAt?.toIso8601String(),
         'rescheduledDate': rescheduledDate?.toIso8601String(),
         'reason': reason,
@@ -78,6 +86,7 @@ class DeliveryModel {
         'emptyCansCollected': emptyCansCollected,
         'damagedCansReported': damagedCansReported,
         'paymentMode': paymentMode,
+        'previousStateJson': previousStateJson,
       };
 
   factory DeliveryModel.fromJson(Map<String, dynamic> json) => DeliveryModel(
@@ -94,6 +103,8 @@ class DeliveryModel {
             ? (DateTime.tryParse(json['deliveryDate'].toString()) ?? DateTime.now())
             : DateTime.now(),
         deliveryTime: json['deliveryTime'] ?? '10:00 AM',
+        deliverySlot: json['deliverySlot'] ?? 'Morning',
+        subscriptionType: json['subscriptionType'] ?? 'Daily',
         completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString()) : null,
         rescheduledDate: json['rescheduledDate'] != null ? DateTime.tryParse(json['rescheduledDate'].toString()) : null,
         reason: json['reason'] ?? '',
@@ -111,6 +122,7 @@ class DeliveryModel {
         emptyCansCollected: (json['emptyCansCollected'] as num?)?.toInt() ?? 0,
         damagedCansReported: (json['damagedCansReported'] as num?)?.toInt() ?? 0,
         paymentMode: json['paymentMode'] ?? 'Cash',
+        previousStateJson: json['previousStateJson'],
       );
 
   DeliveryModel copyWith({
@@ -125,6 +137,8 @@ class DeliveryModel {
     String? deliveryStatus,
     DateTime? deliveryDate,
     String? deliveryTime,
+    String? deliverySlot,
+    String? subscriptionType,
     DateTime? completedAt,
     DateTime? rescheduledDate,
     String? reason,
@@ -138,6 +152,7 @@ class DeliveryModel {
     int? emptyCansCollected,
     int? damagedCansReported,
     String? paymentMode,
+    String? previousStateJson,
   }) {
     return DeliveryModel(
       deliveryId: deliveryId ?? this.deliveryId,
@@ -151,6 +166,8 @@ class DeliveryModel {
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
       deliveryDate: deliveryDate ?? this.deliveryDate,
       deliveryTime: deliveryTime ?? this.deliveryTime,
+      deliverySlot: deliverySlot ?? this.deliverySlot,
+      subscriptionType: subscriptionType ?? this.subscriptionType,
       completedAt: completedAt ?? this.completedAt,
       rescheduledDate: rescheduledDate ?? this.rescheduledDate,
       reason: reason ?? this.reason,
@@ -164,6 +181,7 @@ class DeliveryModel {
       emptyCansCollected: emptyCansCollected ?? this.emptyCansCollected,
       damagedCansReported: damagedCansReported ?? this.damagedCansReported,
       paymentMode: paymentMode ?? this.paymentMode,
+      previousStateJson: previousStateJson ?? this.previousStateJson,
     );
   }
 }

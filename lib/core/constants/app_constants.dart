@@ -16,6 +16,10 @@ class AppConstants {
   static const String expenseBoxName = 'expense_box';
   static const String paymentBoxName = 'payment_box';
   static const String settingsBoxName = 'settings_box';
+  static const String timelineBoxName = 'timeline_box';
+  static const String syncQueueBoxName = 'sync_queue_box';
+  static const String productBoxName = 'product_box';
+  static const String sessionBoxName = 'session_box';
 
   // Card Styling Constants
   static const double cardRadius = 18.0;

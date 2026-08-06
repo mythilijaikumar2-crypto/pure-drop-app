@@ -162,7 +162,7 @@ class MoreScreen extends ConsumerWidget {
             if (isAdmin)
               const _MoreItem(
                 title: 'Settings',
-                subtitle: 'Local storage & Firebase config',
+                subtitle: 'Local storage & system config',
                 icon: Icons.settings_outlined,
                 iconColor: AppColors.textSecondary,
                 route: '/settings',

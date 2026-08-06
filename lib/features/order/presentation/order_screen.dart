@@ -227,10 +227,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
 
   void _showAssignDriverDialog(OrderModel order) {
     final employees = ref.read(employeeProvider);
-    final drivers = employees.where((e) => e.role == UserRole.deliveryBoy).toList();
+    final drivers = employees.where((e) => e.role == UserRole.deliveryBoy && e.isActive).toList();
     if (drivers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No delivery drivers available. Add staff in Employee module.')),
+        const SnackBar(content: Text('No active delivery drivers available. Add or activate staff in Employee module.')),
       );
       return;
     }
@@ -319,14 +319,11 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
           title: const Text('Delete Order'),
-          content: Text('Are you sure you want to delete order "${order.id}"?'),
+          content: Text('Are you sure you want to delete order "${order.id}"? This cannot be undone.'),
           actions: [
-            TextButton(
-              onPressed: isDeleting ? null : () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: isDeleting ? null : () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               onPressed: isDeleting
                   ? null
                   : () async {
@@ -336,27 +333,21 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('✅ Order "${order.id}" deleted successfully!'),
-                              backgroundColor: AppColors.success,
-                            ),
+                            const SnackBar(content: Text('🗑️ Order deleted successfully'), backgroundColor: AppColors.error),
                           );
                         }
                       } catch (e) {
                         setModalState(() => isDeleting = false);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('❌ Error deleting order: $e'),
-                              backgroundColor: AppColors.error,
-                            ),
+                            SnackBar(content: Text('❌ Failed to delete order: $e'), backgroundColor: AppColors.error),
                           );
                         }
                       }
                     },
               child: isDeleting
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Delete'),
+                  : const Text('Delete', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -368,15 +359,17 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final isAdmin = user?.role == UserRole.admin;
+    final isAdmin = user?.role == UserRole.admin || user?.role == UserRole.superAdmin;
     final orders = ref.watch(orderProvider);
 
     final driverOrders = isAdmin
         ? orders
         : orders.where((o) {
-            if (o.assignedDriverId != null && o.assignedDriverId == user?.id) return true;
-            if (o.assignedDriverName != null && user?.name != null && o.assignedDriverName!.toLowerCase().contains(user!.name.toLowerCase())) return true;
-            return false;
+            final uid = user?.id ?? '';
+            final empId = user?.employeeId ?? '';
+            if (o.assignedDriverId == null || o.assignedDriverId!.isEmpty) return false;
+            return (uid.isNotEmpty && o.assignedDriverId == uid) ||
+                   (empId.isNotEmpty && o.assignedDriverId == empId);
           }).toList();
 
     final filtered = _statusFilter == null

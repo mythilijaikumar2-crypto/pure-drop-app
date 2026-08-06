@@ -1,247 +1,151 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../constants/app_constants.dart';
 import '../exceptions/app_exception.dart';
 import '../logger/app_logger.dart';
 import '../storage/hive_service.dart';
 
-/// Firebase-first AuthService.
+/// Pure Local AuthService implementation (No Firebase Dependency).
 ///
-/// All authentication goes through FirebaseAuth.
-/// Hive is ONLY used as a session cache — never as the auth source.
+/// Handles local user authentication and session caching using Hive.
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  // Current active user ID in local session
+  String? _currentUserId;
 
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  String? get currentUserId {
+    if (_currentUserId != null) return _currentUserId;
+    final box = HiveService.getBoxSafe('auth_box');
+    final cachedStr = box?.get('active_user_session');
+    if (cachedStr != null && cachedStr.isNotEmpty) {
+      _currentUserId = cachedStr;
+    }
+    return _currentUserId;
+  }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SYNTHETIC EMAIL HELPER
-  // Converts a username or employee ID into a consistent Firebase-safe email.
-  // e.g. "admin" → "admin@puredropaqua.com"
-  //      "PDAEMP-001" → "pdaemp-001@puredropaqua.com"
-  // ─────────────────────────────────────────────────────────────────────────
   static String syntheticEmail(String identifier) {
     final clean = identifier.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9\-]'), '');
     return '$clean@puredropaqua.com';
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SIGN IN
-  // Firebase Auth sign-in using synthetic email derived from username/employeeId.
-  // Does NOT auto-create accounts — if user not found, throws AuthException
-  // with code 'user-not-found' so the caller can show "Contact Administrator".
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<UserCredential> signIn(String identifier, String password) async {
-    final email = syntheticEmail(identifier);
-    AppLogger.info('🔐 AUTH: signIn → email=$email', 'AUTH');
+  /// Local sign-in using synthetic email / username and password.
+  Future<Map<String, dynamic>> signIn(String identifier, String password) async {
+    final cleanId = identifier.trim().toLowerCase();
+    AppLogger.info('🔐 LOCAL AUTH: signIn → identifier=$cleanId', 'AUTH');
 
-    try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password.trim(),
-      );
-      AppLogger.audit(
-        '✅ AUTH: Firebase Auth success — uid=${credential.user?.uid} email=${credential.user?.email}',
-        'AUTH',
-      );
-      return credential;
-    } on FirebaseAuthException catch (e) {
-      AppLogger.warning('⚠️ AUTH: Sign-in failed (${e.code}): ${e.message}', 'AUTH');
-      // Map Firebase error codes to human-readable messages
-      switch (e.code) {
-        case 'user-not-found':
-          throw const AuthException(
-            'Account not found. Please contact Administrator.',
-            code: 'user-not-found',
-          );
-        case 'wrong-password':
-        case 'invalid-credential':
-          throw const AuthException(
-            'Incorrect password. Please try again.',
-            code: 'wrong-password',
-          );
-        case 'user-disabled':
-          throw const AuthException(
-            'This account has been disabled. Contact Administrator.',
-            code: 'user-disabled',
-          );
-        case 'too-many-requests':
-          throw const AuthException(
-            'Too many failed attempts. Try again later.',
-            code: 'too-many-requests',
-          );
-        default:
-          throw AuthException(
-            e.message ?? 'Authentication failed.',
-            code: e.code,
-          );
-      }
-    } catch (e) {
-      AppLogger.error('❌ AUTH: Unexpected sign-in error', e, null, 'AUTH');
-      throw AuthException('Sign-in failed: $e');
-    }
-  }
+    await Future.delayed(const Duration(milliseconds: 300)); // Simulate async auth
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CREATE FIREBASE AUTH ACCOUNT
-  // Used ONLY by: (a) Admin bootstrap, (b) Admin creating a new employee.
-  // Never called during user login.
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<UserCredential> createFirebaseAccount(String identifier, String password) async {
-    final email = syntheticEmail(identifier);
-    AppLogger.info('🆕 AUTH: createFirebaseAccount → email=$email', 'AUTH');
-
-    try {
-      final credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password.trim(),
-      );
-      AppLogger.audit(
-        '✅ AUTH: Firebase account created — uid=${credential.user?.uid} email=${credential.user?.email}',
-        'AUTH',
-      );
-      return credential;
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        // Account exists — sign in instead
-        return await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password.trim(),
-        );
-      }
-      AppLogger.error('❌ AUTH: createFirebaseAccount failed (${e.code}): ${e.message}', e, null, 'AUTH');
-      throw AuthException(e.message ?? 'Failed to create account', code: e.code);
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // FETCH USER PROFILE BY UID
-  // Loads user document from Firestore users/{uid}.
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>?> fetchUserProfileByUid(String uid) async {
-    try {
-      final doc = await _db.collection('users').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        AppLogger.info('✅ AUTH: Fetched users/$uid from Firestore', 'AUTH');
-        return doc.data();
-      }
-      AppLogger.warning('⚠️ AUTH: users/$uid not found in Firestore', 'AUTH');
-      return null;
-    } catch (e) {
-      AppLogger.error('❌ AUTH: fetchUserProfileByUid failed for uid=$uid', e, null, 'AUTH');
-      return null;
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SAVE USER PROFILE TO FIRESTORE
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> saveUserProfile(String uid, Map<String, dynamic> data) async {
-    try {
-      await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
-      AppLogger.audit('✅ AUTH: User profile saved to users/$uid', 'AUTH');
-    } catch (e) {
-      AppLogger.error('❌ AUTH: saveUserProfile failed for uid=$uid', e, null, 'AUTH');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SIGN OUT
-  // Clears Firebase Auth session.
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-      AppLogger.audit('🔓 AUTH: Firebase session cleared (signed out)', 'AUTH');
-    } catch (e) {
-      AppLogger.error('❌ AUTH: Sign out error', e, null, 'AUTH');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // BOOTSTRAP ADMIN (One-Time Setup)
-  //
-  // Called once from SplashScreen on the very first app launch.
-  // Creates the default admin Firebase Auth account and Firestore user document
-  // so the admin can log in without any manual Firebase Console setup.
-  //
-  // Safe to call on every launch — checks `hasBootstrapped` in Hive first.
-  // ─────────────────────────────────────────────────────────────────────────
-  Future<void> bootstrapAdminIfNeeded() async {
-    try {
-      final alreadyDone = HiveService.getData(
-        AppConstants.authBoxName,
-        'hasBootstrapped',
-        defaultValue: false,
-      );
-      if (alreadyDone == true) {
-        AppLogger.info('ℹ️ AUTH: Bootstrap already completed. Skipping.', 'AUTH');
-        return;
-      }
-
-      AppLogger.info('🚀 AUTH: Running first-time admin bootstrap...', 'AUTH');
-
-      // Create Firebase Auth account for admin (or sign in if already exists)
-      const adminIdentifier = 'admin';
-      const adminPassword = 'admin123';
-      final email = syntheticEmail(adminIdentifier);
-
-      UserCredential credential;
-      try {
-        credential = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: adminPassword,
-        );
-        AppLogger.audit('✅ AUTH: Bootstrap — Admin Firebase account created: uid=${credential.user?.uid}', 'AUTH');
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          // Account already exists — just sign in to get the UID
-          credential = await _auth.signInWithEmailAndPassword(
-            email: email,
-            password: adminPassword,
-          );
-          AppLogger.info('ℹ️ AUTH: Bootstrap — Admin account already exists: uid=${credential.user?.uid}', 'AUTH');
-        } else {
-          AppLogger.error('❌ AUTH: Bootstrap failed (${e.code}): ${e.message}', e, null, 'AUTH');
-          return; // Bootstrap failed — app will still work, admin must use Firebase Console
-        }
-      }
-
-      final uid = credential.user?.uid;
-      if (uid == null) return;
-
-      // Create admin Firestore users/{uid} document
-      final adminDoc = {
-        'uid': uid,
-        'id': uid,
+    final box = HiveService.getBoxSafe('auth_box');
+    
+    // Default system credentials for testing
+    if ((cleanId == 'admin' || cleanId == 'admin@puredropaqua.com') && password == 'admin123') {
+      final adminUser = {
+        'id': 'ADM-001',
+        'uid': 'ADM-001',
         'employeeId': 'PDAEMP-000',
         'name': 'Pure Drop Admin',
         'username': 'admin',
-        'firebaseEmail': email,
+        'firebaseEmail': 'admin@puredropaqua.com',
         'role': 'admin',
         'employeeType': 'Admin',
-        'phone': '',
-        'address': '',
+        'phone': '9876543210',
+        'address': 'HQ Chennai',
         'status': 'Active',
         'firstLogin': false,
-        'createdAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
       };
+      _currentUserId = 'ADM-001';
+      if (box != null) {
+        await box.put('active_user_session', 'ADM-001');
+        await box.put('user_profile_ADM-001', adminUser);
+      }
+      return adminUser;
+    }
 
-      await _db.collection('users').doc(uid).set(adminDoc, SetOptions(merge: true));
-      AppLogger.audit('✅ AUTH: Bootstrap — Admin Firestore document created: users/$uid', 'AUTH');
+    if ((cleanId == 'driver1' || cleanId == 'driver1@puredropaqua.com' || cleanId == 'pdaemp-001') && password == 'driver123') {
+      final driverUser = {
+        'id': 'PDAEMP-001',
+        'uid': 'PDAEMP-001',
+        'employeeId': 'PDAEMP-001',
+        'name': 'Ramesh Kumar',
+        'username': 'driver1',
+        'firebaseEmail': 'driver1@puredropaqua.com',
+        'role': 'deliveryBoy',
+        'employeeType': 'Delivery Staff',
+        'phone': '9123456789',
+        'address': 'Route A, T.Nagar',
+        'status': 'Active',
+        'firstLogin': false,
+      };
+      _currentUserId = 'PDAEMP-001';
+      if (box != null) {
+        await box.put('active_user_session', 'PDAEMP-001');
+        await box.put('user_profile_PDAEMP-001', driverUser);
+      }
+      return driverUser;
+    }
 
-      // Sign out after bootstrap so the login screen is shown normally
-      await _auth.signOut();
+    // Check custom saved employee/user profiles in Hive
+    if (box != null) {
+      final cachedProfile = box.get('user_profile_$cleanId');
+      if (cachedProfile != null && cachedProfile is Map) {
+        _currentUserId = cleanId;
+        await box.put('active_user_session', cleanId);
+        return Map<String, dynamic>.from(cachedProfile);
+      }
+    }
 
-      // Mark bootstrap complete
-      await HiveService.saveData(AppConstants.authBoxName, 'hasBootstrapped', true);
-      AppLogger.audit('✅ AUTH: Bootstrap complete. Admin account ready.', 'AUTH');
-    } catch (e) {
-      AppLogger.error('❌ AUTH: Bootstrap unexpected error', e, null, 'AUTH');
-      // Non-fatal: bootstrap failure should not crash the app
+    // Throw readable AuthException if not matched
+    throw const AuthException(
+      'Invalid credentials. Please check your username/email and password.',
+      code: 'invalid-credential',
+    );
+  }
+
+  /// Create local user account for staff
+  Future<Map<String, dynamic>> createLocalAccount(String identifier, String password, Map<String, dynamic> profile) async {
+    final cleanId = identifier.trim().toLowerCase();
+    AppLogger.info('🆕 LOCAL AUTH: createLocalAccount → identifier=$cleanId', 'AUTH');
+
+    final box = HiveService.getBoxSafe('auth_box');
+    final uid = profile['id'] ?? profile['employeeId'] ?? 'EMP-${DateTime.now().millisecondsSinceEpoch}';
+    final userMap = {
+      ...profile,
+      'id': uid,
+      'uid': uid,
+      'firebaseEmail': syntheticEmail(identifier),
+    };
+
+    if (box != null) {
+      await box.put('user_profile_$uid', userMap);
+      await box.put('user_profile_$cleanId', userMap);
+    }
+    return userMap;
+  }
+
+  Future<Map<String, dynamic>?> fetchUserProfileByUid(String uid) async {
+    final box = HiveService.getBoxSafe('auth_box');
+    if (box != null) {
+      final data = box.get('user_profile_$uid');
+      if (data != null && data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+    }
+    return null;
+  }
+
+  Future<void> saveUserProfile(String uid, Map<String, dynamic> data) async {
+    final box = HiveService.getBoxSafe('auth_box');
+    if (box != null) {
+      await box.put('user_profile_$uid', data);
+    }
+  }
+
+  Future<void> bootstrapAdminIfNeeded() async {
+    AppLogger.info('⚡ LOCAL AUTH: Local admin profile ready.', 'AUTH');
+  }
+
+  Future<void> signOut() async {
+    AppLogger.info('🔓 LOCAL AUTH: signOut', 'AUTH');
+    _currentUserId = null;
+    final box = HiveService.getBoxSafe('auth_box');
+    if (box != null) {
+      await box.delete('active_user_session');
     }
   }
 }

@@ -27,6 +27,7 @@ class OrderModel {
   final String? deliveryProofUrl;
   final String? customerSignatureUrl;
   final String signatureProofPath;
+  final DateTime updatedAt;
 
   OrderModel({
     required this.id,
@@ -43,6 +44,7 @@ class OrderModel {
     this.assignedDriverId,
     this.assignedDriverName,
     required this.createdAt,
+    DateTime? updatedAt,
     this.deliveredAt,
     this.emptyCansCollected = 0,
     this.damagedCansReported = 0,
@@ -55,7 +57,7 @@ class OrderModel {
     this.deliveryProofUrl,
     this.customerSignatureUrl,
     this.signatureProofPath = '',
-  });
+  }) : updatedAt = updatedAt ?? DateTime.now();
 
   bool get isPriority => priority == OrderPriority.high || priority == OrderPriority.urgent;
 
@@ -74,6 +76,7 @@ class OrderModel {
         'assignedDriverId': assignedDriverId,
         'assignedDriverName': assignedDriverName,
         'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
         'deliveredAt': deliveredAt?.toIso8601String(),
         'emptyCansCollected': emptyCansCollected,
         'damagedCansReported': damagedCansReported,
@@ -146,6 +149,9 @@ class OrderModel {
       createdAt: json['createdAt'] != null
           ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
           : (json['OrderDate'] != null ? (DateTime.tryParse(json['OrderDate'].toString()) ?? DateTime.now()) : DateTime.now()),
+      updatedAt: json['updatedAt'] != null
+          ? (DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
       deliveredAt: json['deliveredAt'] != null
           ? DateTime.tryParse(json['deliveredAt'].toString())
           : (json['DeliveryDate'] != null ? DateTime.tryParse(json['DeliveryDate'].toString()) : null),
@@ -181,6 +187,7 @@ class OrderModel {
     String? assignedDriverId,
     String? assignedDriverName,
     DateTime? createdAt,
+    DateTime? updatedAt,
     DateTime? deliveredAt,
     int? emptyCansCollected,
     int? damagedCansReported,
@@ -209,6 +216,7 @@ class OrderModel {
       assignedDriverId: assignedDriverId ?? this.assignedDriverId,
       assignedDriverName: assignedDriverName ?? this.assignedDriverName,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       deliveredAt: deliveredAt ?? this.deliveredAt,
       emptyCansCollected: emptyCansCollected ?? this.emptyCansCollected,
       damagedCansReported: damagedCansReported ?? this.damagedCansReported,

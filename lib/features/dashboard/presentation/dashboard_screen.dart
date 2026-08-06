@@ -102,7 +102,7 @@ class DashboardScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '${AppFormatters.formatDate(DateTime.now())} • Live Sync',
+                                    AppFormatters.formatDate(DateTime.now()),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
@@ -129,7 +129,7 @@ class DashboardScreen extends ConsumerWidget {
                             // Subtitle Description
                             Text(
                               isAdmin
-                                  ? 'Real-time overview of your water distribution business'
+                                  ? 'Overview of your water distribution business'
                                   : "Here are your assigned deliveries for today",
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.9),

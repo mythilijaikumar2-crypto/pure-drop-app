@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../core/exceptions/app_exception.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,10 +17,8 @@ import '../models/user_model.dart';
 import '../models/settings_model.dart';
 import '../models/water_purchase_model.dart';
 import '../models/delivery_model.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/connectivity_service.dart';
-import '../core/services/firestore_service.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/storage_service.dart';
 import '../core/services/sync_service.dart';
@@ -44,7 +40,6 @@ import '../repositories/water_purchase_repository.dart';
 
 // --- CORE SERVICE PROVIDERS ---
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
-final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreService());
 final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
 final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
 final syncServiceProvider = Provider<SyncService>((ref) => SyncService());
@@ -87,83 +82,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService = AuthService();
 
   AuthNotifier() : super(AuthState(isLoading: true)) {
-    // Async session check — starts as loading until Firebase confirms session
     _initSession();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SESSION INIT (on app start / restart)
-  //
-  // Rule: FirebaseAuth.currentUser is the ONLY source of truth.
-  // Hive is only used as a profile cache after Firebase confirms auth.
-  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _initSession() async {
     try {
-      // Step 1: Check Firebase Auth — Firebase persists tokens automatically
-      final firebaseUser = _authService.currentUser;
-
-      if (firebaseUser == null) {
-        // No active Firebase session → must log in
-        debugPrint('ℹ️ AUTH: No Firebase session. Redirecting to Login.');
-        state = AuthState(user: null, isAuthenticated: false);
-        return;
-      }
-
-      debugPrint('✅ AUTH: Firebase session active — uid=${firebaseUser.uid}');
-
-      // Step 2: Restore user profile from Hive cache (fast path)
       final box = HiveService.getBox(AppConstants.authBoxName);
       final userJson = box.get('currentUser');
 
       if (userJson != null) {
         final userMap = Map<String, dynamic>.from(userJson as Map);
-        // Verify the cached UID matches the Firebase session UID (security check)
-        if (userMap['uid'] == firebaseUser.uid) {
-          final user = UserModel.fromJson(userMap);
-          if (user.status == 'Active') {
-            debugPrint('✅ AUTH: Session restored from Hive cache for uid=${user.id}');
-            state = AuthState(user: user, isAuthenticated: true);
-            return;
-          }
-        }
-        // UID mismatch or inactive — clear stale Hive cache
-        await _clearHiveSession();
-      }
-
-      // Step 3: Hive cache miss or stale — fetch fresh profile from Firestore
-      debugPrint('ℹ️ AUTH: Hive cache miss. Fetching profile from Firestore...');
-      final profileData = await _authService.fetchUserProfileByUid(firebaseUser.uid);
-
-      if (profileData != null) {
-        final user = UserModel.fromJson(profileData);
+        final user = UserModel.fromJson(userMap);
         if (user.status == 'Active') {
-          await HiveService.saveData(AppConstants.authBoxName, 'currentUser', user.toJson());
+          debugPrint('✅ LOCAL AUTH: Session restored from Hive cache for user ${user.id} (${user.role.name})');
           state = AuthState(user: user, isAuthenticated: true);
-          debugPrint('✅ AUTH: Session restored from Firestore for uid=${user.id}');
           return;
         }
       }
-
-      // Firestore profile not found or inactive — sign out
-      debugPrint('⚠️ AUTH: No valid Firestore profile. Signing out.');
-      await _authService.signOut();
-      await _clearHiveSession();
       state = AuthState(user: null, isAuthenticated: false);
     } catch (e) {
-      debugPrint('❌ AUTH: Session init error: $e');
+      debugPrint('❌ LOCAL AUTH: Session init error: $e');
       state = AuthState(user: null, isAuthenticated: false);
     }
   }
 
-  /// Public alias for _initSession — called by SplashScreen after bootstrap
   Future<void> checkSavedSession() => _initSession();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LOGIN
-  //
-  // Firebase Auth is MANDATORY. No local fallbacks.
-  // If Firebase fails → show error → stay on Login screen.
-  // ─────────────────────────────────────────────────────────────────────────
   Future<bool> loginWithUsernameOrEmployeeId({
     required String identifier,
     required String password,
@@ -184,62 +128,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState(isLoading: true);
 
     try {
-      // ── Step 1: Firebase Authentication (mandatory) ───────────────────────
-      final UserCredential credential;
-      try {
-        credential = await _authService.signIn(cleanId, cleanPassword);
-      } on AuthException catch (e) {
-        state = AuthState(
-          isAuthenticated: false,
-          isLoading: false,
-          errorMessage: e.message,
-        );
-        return false;
-      }
+      final profileData = await _authService.signIn(cleanId, cleanPassword);
+      final user = UserModel.fromJson(profileData);
 
-      final firebaseUser = credential.user;
-      if (firebaseUser == null) {
-        state = AuthState(
-          isAuthenticated: false,
-          isLoading: false,
-          errorMessage: 'Authentication failed. Please try again.',
-        );
-        return false;
-      }
-
-      debugPrint('✅ AUTH: Firebase Auth success — uid=${firebaseUser.uid} email=${firebaseUser.email}');
-
-      // ── Step 2: Load user profile from Firestore ──────────────────────────
-      final profileData = await _authService.fetchUserProfileByUid(firebaseUser.uid);
-
-      final UserModel user;
-      if (profileData != null) {
-        user = UserModel.fromJson(profileData);
-      } else {
-        // Profile not in Firestore yet (e.g. admin after fresh bootstrap race condition)
-        // Create profile from Firebase Auth data
-        final isAdminId = cleanId.toLowerCase() == 'admin';
-        final email = AuthService.syntheticEmail(cleanId);
-        user = UserModel(
-          id: firebaseUser.uid,
-          employeeId: isAdminId ? 'PDAEMP-000' : cleanId.toUpperCase().startsWith('PDAEMP-') ? cleanId.toUpperCase() : 'EMP-001',
-          name: isAdminId ? 'Pure Drop Admin' : cleanId,
-          username: cleanId.toLowerCase(),
-          firebaseEmail: email,
-          role: isAdminId ? UserRole.admin : UserRole.deliveryBoy,
-          employeeType: isAdminId ? 'Admin' : 'Delivery Staff',
-          status: 'Active',
-        );
-        // Seed Firestore document so future logins work correctly
-        await _authService.saveUserProfile(firebaseUser.uid, {
-          ...user.toJson(),
-          'uid': firebaseUser.uid,
-          'role': user.role.name,
-          'updatedAt': DateTime.now().toIso8601String(),
-        });
-      }
-
-      // ── Step 3: Validate account ──────────────────────────────────────────
       if (user.status != 'Active') {
         await _authService.signOut();
         state = AuthState(
@@ -250,21 +141,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
 
-      // ── Step 4: Persist session in Hive (profile cache, NO password) ──────
-      final sessionUser = user.copyWith(
-        id: firebaseUser.uid, // Always use Firebase UID as canonical id
-        loginTimestamp: DateTime.now(),
-      );
-
+      final sessionUser = user.copyWith(loginTimestamp: DateTime.now());
       await _saveSession(sessionUser, rememberMe);
-      debugPrint('✅ AUTH: Login complete. uid=${sessionUser.id} role=${sessionUser.role.name}');
+      debugPrint('✅ LOCAL AUTH: Login complete. user=${sessionUser.id} role=${sessionUser.role.name}');
       return true;
-    } catch (e) {
-      debugPrint('❌ AUTH: Login error: $e');
+    } on AuthException catch (e) {
       state = AuthState(
         isAuthenticated: false,
         isLoading: false,
-        errorMessage: 'Authentication error. Please try again.',
+        errorMessage: e.message,
+      );
+      return false;
+    } catch (e) {
+      debugPrint('❌ LOCAL AUTH: Login error: $e');
+      state = AuthState(
+        isAuthenticated: false,
+        isLoading: false,
+        errorMessage: 'Authentication error. Please check credentials.',
       );
       return false;
     }
@@ -496,23 +389,8 @@ final orderProvider = StateNotifierProvider<OrderNotifier, List<OrderModel>>((re
 });
 
 final ordersStreamProvider = StreamProvider<List<OrderModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('orders')
-      .snapshots(includeMetadataChanges: true)
-      .map((snapshot) {
-    final list = snapshot.docs.map((doc) => OrderModel.fromJson(doc.data())).toList();
-    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    Future.microtask(() async {
-      final orderBox = HiveService.getBox(AppConstants.orderBoxName);
-      for (final item in list) {
-        await orderBox.put(item.id, jsonEncode(item.toJson()));
-      }
-      ref.read(orderProvider.notifier).refresh();
-    });
-
-    return list;
-  });
+  final orders = ref.watch(orderProvider);
+  return Stream.value(orders);
 });
 
 // --- DELIVERY MANAGEMENT PROVIDER & REALTIME SNAPSHOT STREAM ---
@@ -566,6 +444,52 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       rethrow;
     }
   }
+
+  Future<bool> undoLastAction(String deliveryId) async {
+    final success = await _repo.undoLastDeliveryAction(deliveryId);
+    if (success) {
+      refresh();
+      _ref.read(customerProvider.notifier).refresh();
+      _ref.read(inventoryProvider.notifier).refresh();
+      _ref.read(orderProvider.notifier).refresh();
+    }
+    return success;
+  }
+
+  Future<bool> shiftSlot(String deliveryId, String newSlot) async {
+    final success = await _repo.shiftDeliverySlot(deliveryId, newSlot);
+    if (success) {
+      refresh();
+    }
+    return success;
+  }
+
+  Future<bool> changeQuantity(String deliveryId, int newQuantity) async {
+    final success = await _repo.changeDeliveryQuantity(deliveryId, newQuantity);
+    if (success) {
+      refresh();
+      _ref.read(orderProvider.notifier).refresh();
+    }
+    return success;
+  }
+
+  Future<bool> collectPayment({
+    required String deliveryId,
+    required double amount,
+    required String paymentMode,
+  }) async {
+    final success = await _repo.collectPayment(
+      deliveryId: deliveryId,
+      amount: amount,
+      paymentMode: paymentMode,
+    );
+    if (success) {
+      refresh();
+      _ref.read(paymentProvider.notifier).refresh();
+      _ref.read(customerProvider.notifier).refresh();
+    }
+    return success;
+  }
 }
 
 final deliveryProvider = StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
@@ -573,25 +497,8 @@ final deliveryProvider = StateNotifierProvider<DeliveryNotifier, List<DeliveryMo
 });
 
 final deliveriesStreamProvider = StreamProvider<List<DeliveryModel>>((ref) {
-  return FirebaseFirestore.instance
-      .collection('deliveries')
-      .snapshots(includeMetadataChanges: true)
-      .map((snapshot) {
-    final list = snapshot.docs.map((doc) => DeliveryModel.fromJson(doc.data())).toList();
-    list.sort((a, b) => b.deliveryDate.compareTo(a.deliveryDate));
-
-    Future.microtask(() async {
-      final deliveryBox = HiveService.getBox(AppConstants.deliveryBoxName);
-      for (final item in list) {
-        await deliveryBox.put(item.deliveryId, jsonEncode(item.toJson()));
-      }
-      ref.read(deliveryProvider.notifier).refresh();
-      ref.read(customerProvider.notifier).refresh();
-      ref.read(inventoryProvider.notifier).refresh();
-    });
-
-    return list;
-  });
+  final deliveries = ref.watch(deliveryProvider);
+  return Stream.value(deliveries);
 });
 
 // --- INVENTORY PROVIDER ---

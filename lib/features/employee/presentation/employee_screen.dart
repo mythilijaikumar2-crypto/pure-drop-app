@@ -153,36 +153,32 @@ class _EmployeeScreenState extends ConsumerState<EmployeeScreen> {
                           setModalState(() => isSaving = true);
                           try {
                             String uid = autoId;
-
-                            // 1. Create Firebase Auth user & Firestore profile if new
+                            // 1. Create local Auth user & profile if new
                             if (employee == null) {
                               try {
                                 final authService = AuthService();
-                                final cred = await authService.createFirebaseAccount(
-                                  usernameCtrl.text.trim(),
-                                  passwordCtrl.text.trim(),
-                                );
-                                uid = cred.user?.uid ?? autoId;
-
                                 final userMap = {
-                                  'uid': uid,
                                   'employeeId': autoId,
                                   'username': usernameCtrl.text.trim(),
                                   'name': nameCtrl.text.trim(),
                                   'phone': phoneCtrl.text.trim(),
                                   'address': addressCtrl.text.trim(),
-                                  'role': selectedRole == UserRole.admin ? 'admin' : 'employee',
+                                  'role': selectedRole == UserRole.admin ? 'admin' : 'deliveryBoy',
                                   'status': isActive ? 'Active' : 'Inactive',
                                   'createdAt': DateTime.now().toIso8601String(),
                                   'updatedAt': DateTime.now().toIso8601String(),
                                 };
-
-                                await authService.saveUserProfile(uid, userMap);
+                                final createdMap = await authService.createLocalAccount(
+                                  usernameCtrl.text.trim(),
+                                  passwordCtrl.text.trim(),
+                                  userMap,
+                                );
+                                uid = createdMap['uid'] ?? autoId;
                               } catch (_) {}
                             }
 
                             final item = EmployeeModel(
-                              id: autoId,
+                              id: uid,
                               name: nameCtrl.text.trim(),
                               username: usernameCtrl.text.trim(),
                               phone: phoneCtrl.text.trim(),

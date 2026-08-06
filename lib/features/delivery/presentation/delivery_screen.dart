@@ -8,8 +8,10 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/custom_card.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../models/customer_model.dart';
 import '../../../models/delivery_model.dart';
 import '../../../providers/app_providers.dart';
+import 'widgets/customer_profile_sheet.dart';
 
 class DeliveryScreen extends ConsumerStatefulWidget {
   const DeliveryScreen({super.key});
@@ -19,22 +21,21 @@ class DeliveryScreen extends ConsumerStatefulWidget {
 }
 
 class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
-  String? _selectedDriverFilter;
+  String _selectedStatusTab = 'All';
+  String _selectedSlotFilter = 'All';
 
-  static const List<String> _reasonOptions = [
-    'Customer Requested',
-    'House Locked',
-    'Going Out Of Station',
-    'No Empty Can',
-    'Already Purchased',
-    'Payment Pending',
-    'Customer Not Available',
-    'Vehicle Breakdown',
+  static const List<String> _cancelReasons = [
+    'Customer Not Home',
+    'Customer Cancelled',
     'Wrong Address',
+    'Holiday',
+    'No Stock',
+    'Duplicate Order',
     'Other',
   ];
 
-  void _openGoogleMaps(String address) async {
+  void _openMaps(String address) async {
+    if (address.isEmpty) return;
     final encoded = Uri.encodeComponent(address);
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
     if (await canLaunchUrl(uri)) {
@@ -50,6 +51,52 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
     }
   }
 
+  void _openWhatsApp(String phone) async {
+    if (phone.isEmpty) return;
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final uri = Uri.parse('https://wa.me/91$cleanPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showUndoSnackBar(String deliveryId, String actionMessage) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(deliveryProvider.notifier);
+
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(actionMessage, style: const TextStyle(fontSize: 13))),
+          ],
+        ),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: Colors.amber,
+          onPressed: () async {
+            final undone = await notifier.undoLastAction(deliveryId);
+            if (undone) {
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('Action reverted successfully.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'delivered':
@@ -58,15 +105,10 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
         return AppColors.error;
       case 'rescheduled':
         return Colors.orange;
-      case 'customernotavailable':
-      case 'customer_not_available':
-        return Colors.purple;
       case 'skipped':
-      case 'skiptoday':
         return Colors.grey;
       case 'pending':
       case 'assigned':
-      case 'intransit':
       default:
         return AppColors.primary;
     }
@@ -80,18 +122,32 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
         return 'Cancelled';
       case 'rescheduled':
         return 'Rescheduled';
-      case 'customernotavailable':
-      case 'customer_not_available':
-        return 'Customer Not Available';
       case 'skipped':
-      case 'skiptoday':
         return 'Skipped Today';
       default:
         return 'Pending';
     }
   }
 
-  void _showCompleteDeliveryDialog(DeliveryModel delivery) {
+  void _showCustomerProfile(DeliveryModel delivery) {
+    final customers = ref.read(customerProvider);
+    final customer = customers.cast<CustomerModel?>().firstWhere(
+          (c) => c?.id == delivery.customerId,
+          orElse: () => null,
+        );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CustomerProfileSheet(
+        customer: customer,
+        delivery: delivery,
+      ),
+    );
+  }
+
+  void _showCompleteDeliveryDialog(DeliveryModel delivery, String userDisplayName) {
     final emptyCansCtrl = TextEditingController(text: delivery.quantity.toString());
     final damagedCansCtrl = TextEditingController(text: '0');
     String selectedPaymentMode = 'Cash';
@@ -105,6 +161,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
         builder: (context, setModalState) {
           return AlertDialog(
             title: Text('Complete Delivery - ${delivery.deliveryId}'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             content: SingleChildScrollView(
               child: Form(
                 key: formKey,
@@ -113,14 +170,18 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Customer: ${delivery.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text('Total Amount: ${AppFormatters.formatCurrency(delivery.totalAmount)}', style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total Amount: ${AppFormatters.formatCurrency(delivery.totalAmount)}',
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    ),
                     const Divider(height: 20),
 
                     CustomTextField(
                       label: 'Empty Cans Collected',
                       controller: emptyCansCtrl,
                       keyboardType: TextInputType.number,
-                      prefixIcon: Icons.crop_portrait,
+                      prefixIcon: Icons.water_drop_outlined,
                     ),
                     const SizedBox(height: 12),
 
@@ -132,20 +193,16 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    CustomTextField(
-                      label: 'Customer OTP Code (Required)',
-                      hint: 'Enter 4-digit OTP (Default: 1234)',
-                      prefixIcon: Icons.lock_outline,
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-
                     const Text('Payment Mode Received', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: selectedPaymentMode,
                       isExpanded: true,
-                      items: ['Cash', 'UPI / Online', 'Bank Transfer', 'Credit'].map((mode) {
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      items: ['Cash', 'UPI', 'Pending'].map((mode) {
                         return DropdownMenuItem(value: mode, child: Text(mode));
                       }).toList(),
                       onChanged: (val) {
@@ -157,59 +214,51 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-              ElevatedButton.icon(
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
                 onPressed: isSaving
                     ? null
                     : () async {
                         if (formKey.currentState!.validate()) {
                           setModalState(() => isSaving = true);
+                          final emptyCount = int.tryParse(emptyCansCtrl.text.trim()) ?? delivery.quantity;
+                          final damagedCount = int.tryParse(damagedCansCtrl.text.trim()) ?? 0;
+
                           try {
-                            final authState = ref.read(authProvider);
-                            final currentUser = authState.user;
-                            final updatedBy = currentUser?.name ?? 'Admin';
-                            final updatedRole = currentUser?.role.name ?? 'Admin';
-
-                            final emptyCollected = int.tryParse(emptyCansCtrl.text) ?? 0;
-                            final damagedReported = int.tryParse(damagedCansCtrl.text) ?? 0;
-
-                            final success = await ref.read(deliveryProvider.notifier).executeAction(
+                            final ok = await ref.read(deliveryProvider.notifier).executeAction(
                                   delivery: delivery,
                                   newStatus: 'delivered',
-                                  reason: 'Delivered Successfully',
-                                  remarks: 'Delivered $emptyCollected empty cans returned',
-                                  updatedBy: updatedBy,
-                                  updatedRole: updatedRole,
-                                  emptyCansCollected: emptyCollected,
-                                  damagedCansReported: damagedReported,
+                                  reason: '',
+                                  remarks: 'Delivered',
+                                  updatedBy: userDisplayName,
+                                  updatedRole: 'Delivery Staff',
+                                  emptyCansCollected: emptyCount,
+                                  damagedCansReported: damagedCount,
                                   paymentMode: selectedPaymentMode,
                                 );
 
-                            if (context.mounted) {
+                            if (mounted) {
                               Navigator.pop(context);
-                              if (success) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('✅ Delivery ${delivery.deliveryId} marked as DELIVERED!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                              if (ok) {
+                                _showUndoSnackBar(delivery.deliveryId, 'Delivery marked as Delivered');
                               }
                             }
                           } catch (e) {
                             setModalState(() => isSaving = false);
-                            if (context.mounted) {
+                            if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('❌ Error updating delivery: $e'), backgroundColor: AppColors.error),
+                                SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
                               );
                             }
                           }
                         }
                       },
-                icon: isSaving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.check_circle),
-                label: const Text('Confirm Delivered'),
+                child: isSaving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Confirm Delivered'),
               ),
             ],
           );
@@ -218,16 +267,9 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
     );
   }
 
-  void _showDeliveryActionDialog({
-    required DeliveryModel delivery,
-    required String actionName,
-    required String targetStatus,
-    bool isReschedule = false,
-  }) {
-    String selectedReason = _reasonOptions.first;
-    final remarksCtrl = TextEditingController();
-    DateTime? selectedFutureDate;
-    final formKey = GlobalKey<FormState>();
+  void _showCancelOrderDialog(DeliveryModel delivery, String userDisplayName) {
+    String selectedReason = _cancelReasons.first;
+    final customReasonCtrl = TextEditingController();
     bool isSaving = false;
 
     showDialog(
@@ -235,146 +277,220 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
+          final isOtherSelected = selectedReason == 'Other';
+
           return AlertDialog(
-            title: Text('$actionName - ${delivery.customerName}'),
+            title: const Text('Cancel Order'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             content: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Delivery ID: ${delivery.deliveryId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 12),
-
-                    if (isReschedule) ...[
-                      const Text('Select Reschedule Future Date *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () async {
-                          final tomorrow = DateTime.now().add(const Duration(days: 1));
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: tomorrow,
-                            firstDate: tomorrow,
-                            lastDate: DateTime.now().add(const Duration(days: 90)),
-                          );
-                          if (picked != null) {
-                            setModalState(() => selectedFutureDate = picked);
-                          }
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Select reason for cancelling delivery for ${delivery.customerName}:', style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _cancelReasons.map((reason) {
+                      final isSelected = selectedReason == reason;
+                      return ChoiceChip(
+                        label: Text(reason, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+                        selected: isSelected,
+                        selectedColor: AppColors.error,
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedReason = reason);
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.primary),
-                              const SizedBox(width: 8),
-                              Text(
-                                selectedFutureDate != null
-                                    ? DateFormat('dd MMM yyyy').format(selectedFutureDate!)
-                                    : 'Tap to select Future Date',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: selectedFutureDate != null ? AppColors.textPrimary : AppColors.error,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
-                    const Text('Reason *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedReason,
-                      isExpanded: true,
-                      items: _reasonOptions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedReason = val);
-                      },
-                    ),
+                      );
+                    }).toList(),
+                  ),
+                  if (isOtherSelected) ...[
                     const SizedBox(height: 14),
-
                     CustomTextField(
-                      label: selectedReason == 'Other' ? 'Remarks (Mandatory for "Other") *' : 'Remarks / Notes (Optional)',
-                      controller: remarksCtrl,
-                      hint: 'Enter remarks details...',
-                      validator: (v) {
-                        if (selectedReason == 'Other' && (v == null || v.trim().isEmpty)) {
-                          return 'Remarks are mandatory when "Other" reason is selected';
-                        }
-                        return null;
-                      },
+                      label: 'Specify Reason',
+                      hint: 'Enter cancellation reason...',
+                      controller: customReasonCtrl,
                     ),
                   ],
-                ),
+                ],
               ),
             ),
             actions: [
-              TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(context),
+                child: const Text('Back'),
+              ),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _getStatusColor(targetStatus),
-                  foregroundColor: Colors.white,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
                 onPressed: isSaving
                     ? null
                     : () async {
-                        if (isReschedule && selectedFutureDate == null) {
+                        final finalReason = isOtherSelected ? customReasonCtrl.text.trim() : selectedReason;
+                        if (isOtherSelected && finalReason.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('⚠️ Please select a valid future date for reschedule'), backgroundColor: AppColors.warning),
+                            const SnackBar(content: Text('Please enter a cancellation reason.')),
                           );
                           return;
                         }
 
-                        if (formKey.currentState!.validate()) {
-                          setModalState(() => isSaving = true);
-                          try {
-                            final authState = ref.read(authProvider);
-                            final currentUser = authState.user;
-                            final updatedBy = currentUser?.name ?? 'Admin';
-                            final updatedRole = currentUser?.role.name ?? 'Admin';
-
-                            final success = await ref.read(deliveryProvider.notifier).executeAction(
-                                  delivery: delivery,
-                                  newStatus: targetStatus,
-                                  reason: selectedReason,
-                                  remarks: remarksCtrl.text.trim(),
-                                  updatedBy: updatedBy,
-                                  updatedRole: updatedRole,
-                                  rescheduledDate: selectedFutureDate,
-                                );
-
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              if (success) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('✅ Delivery ${delivery.deliveryId} updated to ${actionName.toUpperCase()}!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
-                              }
-                            }
-                          } catch (e) {
-                            setModalState(() => isSaving = false);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('❌ Error updating action: $e'), backgroundColor: AppColors.error),
+                        setModalState(() => isSaving = true);
+                        try {
+                          final ok = await ref.read(deliveryProvider.notifier).executeAction(
+                                delivery: delivery,
+                                newStatus: 'cancelled',
+                                reason: finalReason,
+                                remarks: 'Cancelled by delivery staff',
+                                updatedBy: userDisplayName,
+                                updatedRole: 'Delivery Staff',
                               );
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            if (ok) {
+                              _showUndoSnackBar(delivery.deliveryId, 'Order cancelled');
                             }
                           }
+                        } catch (e) {
+                          setModalState(() => isSaving = false);
                         }
                       },
                 child: isSaving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text('Submit $actionName'),
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Confirm Cancel'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showChangeQuantityDialog(DeliveryModel delivery) {
+    int qty = delivery.quantity;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            title: const Text('Change Can Quantity'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Customer: ${delivery.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 32, color: AppColors.error),
+                      onPressed: qty > 1 ? () => setModalState(() => qty--) : null,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$qty Cans',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline, size: 32, color: AppColors.success),
+                      onPressed: () => setModalState(() => qty++),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Total: ${AppFormatters.formatCurrency(qty * delivery.unitPrice)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  final ok = await ref.read(deliveryProvider.notifier).changeQuantity(delivery.deliveryId, qty);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    if (ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Quantity updated to $qty Cans')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Update'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showCollectPaymentDialog(DeliveryModel delivery) {
+    String selectedMode = 'Cash';
+    final amountCtrl = TextEditingController(text: delivery.totalAmount.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            title: const Text('Collect Payment'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Customer: ${delivery.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                CustomTextField(
+                  label: 'Amount Collected (₹)',
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  prefixIcon: Icons.currency_rupee,
+                ),
+                const SizedBox(height: 12),
+                const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedMode,
+                  items: ['Cash', 'UPI', 'Pending'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                  onChanged: (val) => setModalState(() => selectedMode = val!),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  final amt = double.tryParse(amountCtrl.text.trim()) ?? delivery.totalAmount;
+                  final ok = await ref.read(deliveryProvider.notifier).collectPayment(
+                        deliveryId: delivery.deliveryId,
+                        amount: amt,
+                        paymentMode: selectedMode,
+                      );
+                  if (mounted) {
+                    Navigator.pop(context);
+                    if (ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Payment of ${AppFormatters.formatCurrency(amt)} recorded via $selectedMode')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Save Payment'),
               ),
             ],
           );
@@ -385,295 +501,454 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final currentUid = user?.id ?? '';
+    final currentEmpId = user?.employeeId ?? '';
     final isDriver = user?.role == UserRole.deliveryBoy;
-    final employees = ref.watch(employeeProvider);
+    final userDisplayName = user?.name ?? 'Delivery Staff';
 
-    // Watch real-time snapshot stream
-    final deliveriesStream = ref.watch(deliveriesStreamProvider);
-    final List<DeliveryModel> allDeliveries = deliveriesStream.asData?.value ?? ref.watch(deliveryProvider);
+    final deliveries = ref.watch(deliveryProvider);
+    final expenses = ref.watch(expenseProvider);
 
-    // Filter deliveries based on driver/admin selection
-    final filteredDeliveries = allDeliveries.where((d) {
-      if (isDriver) {
-        if (user?.id != null && user!.id.isNotEmpty) {
-          return d.employeeId == user.id;
-        }
-        return d.employeeName.isNotEmpty && user?.name != null && d.employeeName.toLowerCase() == user!.name.toLowerCase();
-      } else {
-        if (_selectedDriverFilter != null && _selectedDriverFilter!.isNotEmpty) {
-          if (d.employeeId == _selectedDriverFilter || d.employeeName == _selectedDriverFilter) return true;
-          return false;
-        }
-        return true;
-      }
-    }).toList();
+    final driverDeliveries = isDriver
+        ? deliveries.where((d) => d.employeeId == currentUid || d.employeeId == currentEmpId).toList()
+        : deliveries;
 
-    // Active today deliveries (Excludes cancelled, delivered, and rescheduled to future)
-    final now = DateTime.now();
-    final todayDeliveries = filteredDeliveries.where((d) {
-      final status = d.deliveryStatus.toLowerCase();
-      if (status == 'cancelled' || status == 'delivered') return false;
-      if (status == 'rescheduled' && d.rescheduledDate != null && d.rescheduledDate!.isAfter(DateTime(now.year, now.month, now.day, 23, 59))) {
-        return false; // Removed from today's list
-      }
+    // Filter by delivery slot
+    final slotFiltered = _selectedSlotFilter == 'All'
+        ? driverDeliveries
+        : driverDeliveries.where((d) => d.deliverySlot.toLowerCase() == _selectedSlotFilter.toLowerCase()).toList();
+
+    // Metrics calculations
+    final totalOrders = slotFiltered.length;
+    final deliveredCount = slotFiltered.where((d) => d.deliveryStatus == 'delivered').length;
+    final pendingCount = slotFiltered.where((d) => d.deliveryStatus == 'pending' || d.deliveryStatus == 'assigned').length;
+    final amountCollected = slotFiltered.where((d) => d.deliveryStatus == 'delivered').fold(0.0, (sum, d) => sum + d.totalAmount);
+    final pendingAmount = slotFiltered.where((d) => d.deliveryStatus != 'delivered' && d.deliveryStatus != 'cancelled').fold(0.0, (sum, d) => sum + d.totalAmount);
+    final emptyCansCount = slotFiltered.fold(0, (sum, d) => sum + d.emptyCansCollected);
+    final damagedCansCount = slotFiltered.fold(0, (sum, d) => sum + d.damagedCansReported);
+
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final todayExpenses = expenses
+        .where((e) => DateFormat('yyyy-MM-dd').format(e.date) == todayStr)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    // Filter list for tab
+    final displayList = slotFiltered.where((d) {
+      if (_selectedStatusTab == 'All') return true;
+      if (_selectedStatusTab == 'Pending') return d.deliveryStatus == 'pending' || d.deliveryStatus == 'assigned';
+      if (_selectedStatusTab == 'Delivered') return d.deliveryStatus == 'delivered';
+      if (_selectedStatusTab == 'Cancelled') return d.deliveryStatus == 'cancelled';
+      if (_selectedStatusTab == 'Skipped') return d.deliveryStatus == 'skipped';
       return true;
     }).toList();
 
-    final completedToday = filteredDeliveries.where((d) => d.deliveryStatus.toLowerCase() == 'delivered').toList();
-
-    return DefaultTabController(
-      length: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : AppColors.surface,
+      appBar: AppBar(
+        title: Text(isDriver ? 'My Delivery Tasks' : 'Deliveries Overview'),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              ref.read(deliveryProvider.notifier).refresh();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Deliveries refreshed'), duration: Duration(seconds: 1)),
+              );
+            },
+          ),
+        ],
+      ),
+      body: SafeArea(
         child: Column(
           children: [
-            // Admin Driver Filter Header & Real-time Indicator
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Delivery Dispatch', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text('Real-time Firestore Snapshot Sync Active', style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isDriver)
-                  DropdownButton<String?>(
-                    value: _selectedDriverFilter,
-                    hint: const Text('All Drivers'),
-                    underline: const SizedBox(),
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Drivers')),
-                      ...employees.where((e) => e.role == UserRole.deliveryBoy).map((e) {
-                        return DropdownMenuItem<String?>(value: e.name, child: Text(e.name));
-                      }),
-                    ],
-                    onChanged: (val) => setState(() => _selectedDriverFilter = val),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            const TabBar(
-              tabs: [
-                Tab(text: "Today's Pending Deliveries"),
-                Tab(text: "Completed Logs"),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            Expanded(
-              child: TabBarView(
+            // Responsive Dashboard Counters Header
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
                 children: [
-                  // Pending Deliveries Tab
-                  todayDeliveries.isEmpty
-                      ? EmptyStateWidget(
-                          title: isDriver ? 'No Pending Assignments' : 'No Today Deliveries',
-                          description: 'All assigned deliveries have been completed or processed!',
-                          icon: Icons.task_alt,
-                        )
-                      : ListView.builder(
-                          itemCount: todayDeliveries.length,
-                          itemBuilder: (context, index) {
-                            final item = todayDeliveries[index];
-                            final statusColor = _getStatusColor(item.deliveryStatus);
-                            final statusText = _getStatusDisplayName(item.deliveryStatus);
-                            final isDelivered = item.deliveryStatus.toLowerCase() == 'delivered';
+                  _buildAnimatedMetricChip(context, title: 'Total Tasks', value: totalOrders.toString(), color: Colors.blue),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Delivered', value: deliveredCount.toString(), color: AppColors.success),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Pending', value: pendingCount.toString(), color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Collected', value: AppFormatters.formatCurrency(amountCollected), color: Colors.teal),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Pending ₹', value: AppFormatters.formatCurrency(pendingAmount), color: Colors.orange),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Empty Cans', value: '$emptyCansCount Cans', color: Colors.cyan),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Damaged', value: '$damagedCansCount Cans', color: AppColors.error),
+                  const SizedBox(width: 8),
+                  _buildAnimatedMetricChip(context, title: 'Expenses', value: AppFormatters.formatCurrency(todayExpenses), color: Colors.purple),
+                ],
+              ),
+            ),
 
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: CustomCard(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+            // Slot Filter Bar (All, Morning, Evening)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  const Text('Slot:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(width: 12),
+                  _buildSlotFilterChip('All'),
+                  const SizedBox(width: 6),
+                  _buildSlotFilterChip('Morning'),
+                  const SizedBox(width: 6),
+                  _buildSlotFilterChip('Evening'),
+                ],
+              ),
+            ),
+
+            // Status Tabs (All, Pending, Delivered, Skipped, Cancelled)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ['All', 'Pending', 'Delivered', 'Skipped', 'Cancelled'].map((status) {
+                    final isSelected = _selectedStatusTab == status;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        label: Text(status, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : null)),
+                        selected: isSelected,
+                        selectedColor: AppColors.primary,
+                        onSelected: (val) {
+                          if (val) setState(() => _selectedStatusTab = status);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // Delivery Orders List
+            Expanded(
+              child: displayList.isEmpty
+                  ? const EmptyStateWidget(
+                      icon: Icons.local_shipping_outlined,
+                      title: 'No Deliveries Found',
+                      description: 'No assigned delivery orders matching the selected filter.',
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: displayList.length,
+                      itemBuilder: (context, index) {
+                        final delivery = displayList[index];
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: CustomCard(
+                            padding: const EdgeInsets.all(14),
+                            onTap: () => _showCustomerProfile(delivery),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top row: Customer Name & Status Badge
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              delivery.customerName,
+                                              style: theme.textTheme.titleMedium?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: (delivery.deliverySlot == 'Morning' ? Colors.amber : Colors.indigo).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  delivery.deliverySlot == 'Morning' ? Icons.wb_sunny : Icons.nights_stay,
+                                                  size: 12,
+                                                  color: delivery.deliverySlot == 'Morning' ? Colors.amber.shade800 : Colors.indigo,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  delivery.deliverySlot,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: delivery.deliverySlot == 'Morning' ? Colors.amber.shade800 : Colors.indigo,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(delivery.deliveryStatus).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        _getStatusDisplayName(delivery.deliveryStatus),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: _getStatusColor(delivery.deliveryStatus),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+
+                                // Address & Phone
+                                Text(
+                                  delivery.address,
+                                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Quantity & Total Amount Row
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Row(
                                       children: [
-                                        Expanded(
-                                          child: Text(
-                                            item.customerName,
-                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        if (item.phone.isNotEmpty)
-                                          IconButton(
-                                            icon: const Icon(Icons.phone, color: AppColors.success, size: 18),
-                                            onPressed: () => _callCustomer(item.phone),
-                                            tooltip: 'Call Customer',
-                                          ),
-                                        IconButton(
-                                          icon: const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
-                                          onPressed: () => _openGoogleMaps(item.address),
-                                          tooltip: 'Navigate Google Maps',
-                                        ),
-                                        const SizedBox(width: 4),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: statusColor.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: statusColor),
+                                            color: AppColors.primary.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
-                                            statusText,
-                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                                            '${delivery.quantity} Cans',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary),
                                           ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          AppFormatters.formatCurrency(delivery.totalAmount),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${item.quantity} Cans • Total: ${AppFormatters.formatCurrency(item.totalAmount)} • Time: ${item.deliveryTime}',
-                                      style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w600),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(item.address, style: const TextStyle(color: AppColors.textSecondary)),
-                                    if (item.phone.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Text('Contact: ${item.phone}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                    ],
-                                    const SizedBox(height: 6),
+
+                                    // Quick Communication Action Buttons (Call, WhatsApp, Maps)
                                     Row(
                                       children: [
-                                        Text('Updated By: ${item.updatedBy.isNotEmpty ? item.updatedBy : "System"}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                        const Spacer(),
-                                        Text('Last Updated: ${DateFormat('dd MMM hh:mm a').format(item.updatedAt)}', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 14),
-
-                                    // Delivery Action Buttons
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 6,
-                                      children: [
-                                        // Deliver Button
-                                        ElevatedButton.icon(
-                                          onPressed: isDelivered ? null : () => _showCompleteDeliveryDialog(item),
-                                          icon: const Icon(Icons.check_circle_outline, size: 14),
-                                          label: const Text('Deliver'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.success,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
+                                        IconButton(
+                                          icon: const Icon(Icons.phone_outlined, size: 20, color: Colors.blue),
+                                          onPressed: () => _callCustomer(delivery.phone),
+                                          tooltip: 'Call',
                                         ),
-                                        // Reschedule Button
-                                        OutlinedButton.icon(
-                                          onPressed: () => _showDeliveryActionDialog(
-                                            delivery: item,
-                                            actionName: 'Reschedule',
-                                            targetStatus: 'rescheduled',
-                                            isReschedule: true,
-                                          ),
-                                          icon: const Icon(Icons.edit_calendar, size: 14, color: Colors.orange),
-                                          label: const Text('Reschedule', style: TextStyle(color: Colors.orange)),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.orange),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
+                                        IconButton(
+                                          icon: const Icon(Icons.chat_outlined, size: 20, color: Color(0xFF25D366)),
+                                          onPressed: () => _openWhatsApp(delivery.phone),
+                                          tooltip: 'WhatsApp',
                                         ),
-                                        // Cancel Button
-                                        OutlinedButton.icon(
-                                          onPressed: () => _showDeliveryActionDialog(
-                                            delivery: item,
-                                            actionName: 'Cancel Delivery',
-                                            targetStatus: 'cancelled',
-                                          ),
-                                          icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.error),
-                                          label: const Text('Cancel', style: TextStyle(color: AppColors.error)),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: AppColors.error),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
-                                        ),
-                                        // Customer Not Available
-                                        OutlinedButton.icon(
-                                          onPressed: () => _showDeliveryActionDialog(
-                                            delivery: item,
-                                            actionName: 'Customer Not Available',
-                                            targetStatus: 'customerNotAvailable',
-                                          ),
-                                          icon: const Icon(Icons.person_off_outlined, size: 14, color: Colors.purple),
-                                          label: const Text('Not Available', style: TextStyle(color: Colors.purple)),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.purple),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
-                                        ),
-                                        // Skip Today
-                                        OutlinedButton.icon(
-                                          onPressed: () => _showDeliveryActionDialog(
-                                            delivery: item,
-                                            actionName: 'Skip Today',
-                                            targetStatus: 'skipped',
-                                          ),
-                                          icon: const Icon(Icons.skip_next_rounded, size: 14, color: Colors.grey),
-                                          label: const Text('Skip Today', style: TextStyle(color: Colors.grey)),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.grey),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
+                                        IconButton(
+                                          icon: const Icon(Icons.navigation_outlined, size: 20, color: AppColors.primary),
+                                          onPressed: () => _openMaps(delivery.address),
+                                          tooltip: 'Maps',
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                              ),
-                            );
-                          },
-                        ),
 
-                  // Completed Logs Tab
-                  completedToday.isEmpty
-                      ? const EmptyStateWidget(
-                          title: 'No Completed Delivery Logs Today',
-                          description: 'Completed delivery logs will appear here.',
-                        )
-                      : ListView.builder(
-                          itemCount: completedToday.length,
-                          itemBuilder: (context, index) {
-                            final item = completedToday[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: CustomCard(
-                                child: ListTile(
-                                  leading: const CircleAvatar(
-                                    backgroundColor: AppColors.successLight,
-                                    child: Icon(Icons.check, color: AppColors.success),
-                                  ),
-                                  title: Text(item.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text('Delivered ${item.quantity} Cans | Updated By: ${item.updatedBy}'),
-                                  trailing: Text(
-                                    AppFormatters.formatCurrency(item.totalAmount),
-                                    style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
+                                const Divider(height: 16),
+
+                                // Employee Delivery Action Buttons Row
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      if (delivery.deliveryStatus != 'delivered') ...[
+                                        ElevatedButton.icon(
+                                          onPressed: () => _showCompleteDeliveryDialog(delivery, userDisplayName),
+                                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                                          label: const Text('Delivered'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.success,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+
+                                        OutlinedButton.icon(
+                                          onPressed: () => _showCollectPaymentDialog(delivery),
+                                          icon: const Icon(Icons.payment, size: 16),
+                                          label: const Text('Payment'),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+
+                                        OutlinedButton.icon(
+                                          onPressed: () => _showChangeQuantityDialog(delivery),
+                                          icon: const Icon(Icons.edit_outlined, size: 16),
+                                          label: const Text('Qty'),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+
+                                        OutlinedButton.icon(
+                                          onPressed: () async {
+                                            final nextSlot = delivery.deliverySlot == 'Morning' ? 'Evening' : 'Morning';
+                                            final ok = await ref.read(deliveryProvider.notifier).shiftSlot(delivery.deliveryId, nextSlot);
+                                            if (ok && mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text('Shifted delivery to $nextSlot slot')),
+                                              );
+                                            }
+                                          },
+                                          icon: const Icon(Icons.swap_horiz, size: 16),
+                                          label: Text('Shift ${delivery.deliverySlot == "Morning" ? "Evening" : "Morning"}'),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+
+                                        OutlinedButton.icon(
+                                          onPressed: () async {
+                                            final ok = await ref.read(deliveryProvider.notifier).executeAction(
+                                                  delivery: delivery,
+                                                  newStatus: 'skipped',
+                                                  reason: 'Skipped Today',
+                                                  remarks: 'Skipped by driver',
+                                                  updatedBy: userDisplayName,
+                                                  updatedRole: 'Delivery Staff',
+                                                );
+                                            if (ok && mounted) {
+                                              _showUndoSnackBar(delivery.deliveryId, 'Delivery skipped today');
+                                            }
+                                          },
+                                          icon: const Icon(Icons.next_plan_outlined, size: 16),
+                                          label: const Text('Skip Today'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.orange,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+
+                                        OutlinedButton.icon(
+                                          onPressed: () => _showCancelOrderDialog(delivery, userDisplayName),
+                                          icon: const Icon(Icons.cancel_outlined, size: 16),
+                                          label: const Text('Cancel'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.error,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            textStyle: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                      ],
+                                      if (delivery.deliveryStatus == 'delivered')
+                                        Text(
+                                          'Completed at ${delivery.completedAt != null ? DateFormat("hh:mm a").format(delivery.completedAt!) : "Today"} (${delivery.paymentMode})',
+                                          style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                ],
-              ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAnimatedMetricChip(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(isDark ? 0.2 : 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 2),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            builder: (context, val, child) {
+              return Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlotFilterChip(String slot) {
+    final isSelected = _selectedSlotFilter == slot;
+    return ChoiceChip(
+      label: Text(slot, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : null)),
+      selected: isSelected,
+      selectedColor: AppColors.primary,
+      onSelected: (val) {
+        if (val) setState(() => _selectedSlotFilter = slot);
+      },
     );
   }
 }
