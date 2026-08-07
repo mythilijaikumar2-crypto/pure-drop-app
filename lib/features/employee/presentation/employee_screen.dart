@@ -32,9 +32,11 @@ class _EmployeeScreenState extends ConsumerState<EmployeeScreen> {
   String _searchQuery = '';
   UserRole? _roleFilter;
 
-  void _showAddEmployeeDialog([EmployeeModel? employee]) {
+  void _showAddEmployeeDialog([EmployeeModel? employee]) async {
     final empRepo = ref.read(employeeRepositoryProvider);
-    final autoId = employee?.id.isNotEmpty == true ? employee!.id : empRepo.generateNextEmployeeId();
+    final String autoId = (employee != null && employee.id.isNotEmpty)
+        ? employee.id
+        : await empRepo.generateNextEmployeeId();
 
     final nameCtrl = TextEditingController(text: employee?.name ?? '');
     final usernameCtrl = TextEditingController(text: employee?.username ?? '');

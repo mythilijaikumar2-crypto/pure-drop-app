@@ -10,6 +10,9 @@ class PaymentModel {
   final DateTime date;
   final String notes;
 
+  DateTime get createdAt => date;
+  String get referenceNumber => referenceNo;
+
   PaymentModel({
     required this.id,
     required this.customerId,

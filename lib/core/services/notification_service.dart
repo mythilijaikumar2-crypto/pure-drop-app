@@ -9,4 +9,12 @@ class NotificationService {
   void sendMockNotification(String title, String body) {
     AppLogger.info('Local notification: $title - $body', 'NOTIFICATIONS');
   }
+
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    AppLogger.info('[$id] Local notification: $title - $body', 'NOTIFICATIONS');
+  }
 }

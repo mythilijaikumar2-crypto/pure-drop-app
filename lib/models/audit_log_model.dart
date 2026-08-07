@@ -1,49 +1,53 @@
 class AuditLogModel {
   final String id;
-  final String module;
-  final String recordId;
+  final String entityName;
+  final String entityId;
   final String action;
   final String performedBy;
-  final String performedRole;
+  final DateTime timestamp;
   final Map<String, dynamic> oldData;
   final Map<String, dynamic> newData;
-  final DateTime createdAt;
+  final String tenantId;
+  final String branchId;
 
   AuditLogModel({
     required this.id,
-    required this.module,
-    required this.recordId,
+    required this.entityName,
+    required this.entityId,
     required this.action,
     required this.performedBy,
-    required this.performedRole,
+    required this.timestamp,
     this.oldData = const {},
     this.newData = const {},
-    DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+    this.tenantId = 'TENANT_DEFAULT',
+    this.branchId = 'BRANCH_MAIN',
+  });
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'module': module,
-        'recordId': recordId,
+        'entityName': entityName,
+        'entityId': entityId,
         'action': action,
         'performedBy': performedBy,
-        'performedRole': performedRole,
+        'timestamp': timestamp.toIso8601String(),
         'oldData': oldData,
         'newData': newData,
-        'createdAt': createdAt.toIso8601String(),
+        'tenantId': tenantId,
+        'branchId': branchId,
       };
 
   factory AuditLogModel.fromJson(Map<String, dynamic> json) => AuditLogModel(
         id: json['id'] ?? '',
-        module: json['module'] ?? 'Deliveries',
-        recordId: json['recordId'] ?? '',
+        entityName: json['entityName'] ?? '',
+        entityId: json['entityId'] ?? '',
         action: json['action'] ?? '',
-        performedBy: json['performedBy'] ?? '',
-        performedRole: json['performedRole'] ?? 'Admin',
+        performedBy: json['performedBy'] ?? 'Admin',
+        timestamp: json['timestamp'] != null
+            ? DateTime.parse(json['timestamp'])
+            : DateTime.now(),
         oldData: Map<String, dynamic>.from(json['oldData'] ?? {}),
         newData: Map<String, dynamic>.from(json['newData'] ?? {}),
-        createdAt: json['createdAt'] != null
-            ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
-            : DateTime.now(),
+        tenantId: json['tenantId'] ?? 'TENANT_DEFAULT',
+        branchId: json['branchId'] ?? 'BRANCH_MAIN',
       );
 }

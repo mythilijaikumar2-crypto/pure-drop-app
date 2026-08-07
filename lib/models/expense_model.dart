@@ -8,6 +8,8 @@ class ExpenseModel {
   final String spentBy;
   final DateTime date;
 
+  String get title => description.isNotEmpty ? description : category.displayName;
+
   ExpenseModel({
     required this.id,
     required this.category,

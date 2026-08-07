@@ -17,6 +17,15 @@ class CustomerModel {
   final bool isActive;
   final String notes;
   final DateTime? createdAt;
+  final String area;
+  final String subscriptionFrequency; // Daily, Alternate Days, Weekly, Monthly, Custom
+  final int quantityPerDelivery;
+  final String preferredTimeSlot; // Morning, Afternoon, Evening
+  final DateTime? nextDeliveryDate;
+  final String? assignedEmployeeId;
+  final String? assignedEmployeeName;
+  final DateTime? vacationStartDate;
+  final DateTime? vacationEndDate;
 
   CustomerModel({
     required this.id,
@@ -35,7 +44,23 @@ class CustomerModel {
     this.isActive = true,
     this.notes = '',
     this.createdAt,
+    this.area = 'Default Zone',
+    this.subscriptionFrequency = 'Daily',
+    this.quantityPerDelivery = 1,
+    this.preferredTimeSlot = 'Morning',
+    this.nextDeliveryDate,
+    this.assignedEmployeeId,
+    this.assignedEmployeeName,
+    this.vacationStartDate,
+    this.vacationEndDate,
   });
+
+  bool get isVacationActive {
+    if (vacationStartDate == null || vacationEndDate == null) return false;
+    final now = DateTime.now();
+    return now.isAfter(vacationStartDate!.subtract(const Duration(days: 1))) &&
+        now.isBefore(vacationEndDate!.add(const Duration(days: 1)));
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -54,6 +79,15 @@ class CustomerModel {
         'isActive': isActive,
         'notes': notes,
         'createdAt': createdAt?.toIso8601String(),
+        'area': area,
+        'subscriptionFrequency': subscriptionFrequency,
+        'quantityPerDelivery': quantityPerDelivery,
+        'preferredTimeSlot': preferredTimeSlot,
+        'nextDeliveryDate': nextDeliveryDate?.toIso8601String(),
+        'assignedEmployeeId': assignedEmployeeId,
+        'assignedEmployeeName': assignedEmployeeName,
+        'vacationStartDate': vacationStartDate?.toIso8601String(),
+        'vacationEndDate': vacationEndDate?.toIso8601String(),
       };
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) => CustomerModel(
@@ -76,6 +110,15 @@ class CustomerModel {
         isActive: json['isActive'] ?? true,
         notes: json['notes'] ?? '',
         createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+        area: json['area'] ?? json['Zone'] ?? 'Default Zone',
+        subscriptionFrequency: json['subscriptionFrequency'] ?? json['Frequency'] ?? 'Daily',
+        quantityPerDelivery: (json['quantityPerDelivery'] as num?)?.toInt() ?? (json['DailyQuantity'] as num?)?.toInt() ?? 1,
+        preferredTimeSlot: json['preferredTimeSlot'] ?? 'Morning',
+        nextDeliveryDate: json['nextDeliveryDate'] != null ? DateTime.tryParse(json['nextDeliveryDate']) : null,
+        assignedEmployeeId: json['assignedEmployeeId'],
+        assignedEmployeeName: json['assignedEmployeeName'],
+        vacationStartDate: json['vacationStartDate'] != null ? DateTime.tryParse(json['vacationStartDate']) : null,
+        vacationEndDate: json['vacationEndDate'] != null ? DateTime.tryParse(json['vacationEndDate']) : null,
       );
 
   CustomerModel copyWith({
@@ -95,6 +138,15 @@ class CustomerModel {
     bool? isActive,
     String? notes,
     DateTime? createdAt,
+    String? area,
+    String? subscriptionFrequency,
+    int? quantityPerDelivery,
+    String? preferredTimeSlot,
+    DateTime? nextDeliveryDate,
+    String? assignedEmployeeId,
+    String? assignedEmployeeName,
+    DateTime? vacationStartDate,
+    DateTime? vacationEndDate,
   }) {
     return CustomerModel(
       id: id ?? this.id,
@@ -113,6 +165,15 @@ class CustomerModel {
       isActive: isActive ?? this.isActive,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      area: area ?? this.area,
+      subscriptionFrequency: subscriptionFrequency ?? this.subscriptionFrequency,
+      quantityPerDelivery: quantityPerDelivery ?? this.quantityPerDelivery,
+      preferredTimeSlot: preferredTimeSlot ?? this.preferredTimeSlot,
+      nextDeliveryDate: nextDeliveryDate ?? this.nextDeliveryDate,
+      assignedEmployeeId: assignedEmployeeId ?? this.assignedEmployeeId,
+      assignedEmployeeName: assignedEmployeeName ?? this.assignedEmployeeName,
+      vacationStartDate: vacationStartDate ?? this.vacationStartDate,
+      vacationEndDate: vacationEndDate ?? this.vacationEndDate,
     );
   }
 }

@@ -9,6 +9,7 @@ class SettingsModel {
   final String invoiceFooterNote;
   final bool enableOfflineSync;
   final bool enableFcmNotifications;
+  final List<DateTime> deliveryOffDays;
 
   SettingsModel({
     this.defaultWaterPrice = 35.0,
@@ -21,6 +22,7 @@ class SettingsModel {
     this.invoiceFooterNote = 'Pure Water for Healthy Living. Thank you for your business!',
     this.enableOfflineSync = true,
     this.enableFcmNotifications = true,
+    this.deliveryOffDays = const [],
   });
 
   Map<String, dynamic> toJson() => {

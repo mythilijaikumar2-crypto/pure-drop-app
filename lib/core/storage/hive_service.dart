@@ -23,9 +23,14 @@ class HiveService {
     await _openBoxSafe(AppConstants.deliveryBoxName);
     await _openBoxSafe(AppConstants.employeeBoxName);
     await _openBoxSafe(AppConstants.salaryBoxName);
+    await _openBoxSafe(AppConstants.attendanceBoxName);
     await _openBoxSafe(AppConstants.expenseBoxName);
     await _openBoxSafe(AppConstants.paymentBoxName);
     await _openBoxSafe(AppConstants.settingsBoxName);
+    await _openBoxSafe(AppConstants.timelineBoxName);
+    await _openBoxSafe(AppConstants.syncQueueBoxName);
+    await _openBoxSafe(AppConstants.productBoxName);
+    await _openBoxSafe(AppConstants.sessionBoxName);
 
     _isInitialized = true;
   }

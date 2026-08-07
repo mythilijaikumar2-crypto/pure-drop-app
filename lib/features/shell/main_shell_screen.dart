@@ -7,13 +7,26 @@ import '../../core/widgets/role_badge.dart';
 import '../../core/widgets/water_ripple_effect.dart';
 import '../../providers/app_providers.dart';
 
-class MainShellScreen extends ConsumerWidget {
+class MainShellScreen extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainShellScreen({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
+}
+
+class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(automationEngineProvider).checkAndRunDailyAutomations();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isAdmin = user?.role == UserRole.admin || user?.role == UserRole.superAdmin;
@@ -197,7 +210,7 @@ class MainShellScreen extends ConsumerWidget {
                 );
               }).toList(),
             ),
-          Expanded(child: WaterRippleEffect(child: child)),
+          Expanded(child: WaterRippleEffect(child: widget.child)),
         ],
       ),
       bottomNavigationBar: isWideScreen
