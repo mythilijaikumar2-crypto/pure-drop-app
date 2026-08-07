@@ -83,7 +83,7 @@ class CustomerProfileSheet extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 26,
-                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                   child: Text(
                     delivery.customerName.isNotEmpty ? delivery.customerName[0].toUpperCase() : 'C',
                     style: const TextStyle(
@@ -229,9 +229,9 @@ class CustomerProfileSheet extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
+                  color: Colors.amber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -357,7 +357,7 @@ class CustomerProfileSheet extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 12,
-            backgroundColor: isDone ? activeColor : isCurrent ? activeColor.withOpacity(0.2) : Colors.grey.shade300,
+            backgroundColor: isDone ? activeColor : isCurrent ? activeColor.withValues(alpha: 0.2) : Colors.grey.shade300,
             child: Icon(
               isDone ? Icons.check : Icons.circle,
               size: 14,

@@ -75,7 +75,7 @@ final notificationServiceProvider = Provider<NotificationService>((ref) => Notif
 final syncServiceProvider = Provider<SyncService>((ref) => SyncService());
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) => ConnectivityService());
 
-// --- ABSTRACT REPOSITORY PROVIDERS (FUTURE FIREBASE READY) ---
+// --- ABSTRACT REPOSITORY PROVIDERS ---
 final customerRepositoryProvider = Provider<ICustomerRepository>((ref) => HiveCustomerRepository());
 final orderRepositoryProvider = Provider<IOrderRepository>((ref) => HiveOrderRepository());
 final employeeRepositoryProvider = Provider<IEmployeeRepository>((ref) => HiveEmployeeRepository());

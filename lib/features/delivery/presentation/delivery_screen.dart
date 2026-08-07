@@ -240,7 +240,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                   paymentMode: selectedPaymentMode,
                                 );
 
-                            if (mounted) {
+                            if (context.mounted) {
                               Navigator.pop(context);
                               if (ok) {
                                 _showUndoSnackBar(delivery.deliveryId, 'Delivery marked as Delivered');
@@ -248,7 +248,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                             }
                           } catch (e) {
                             setModalState(() => isSaving = false);
-                            if (mounted) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
                               );
@@ -344,7 +344,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                 updatedRole: 'Delivery Staff',
                               );
 
-                          if (mounted) {
+                          if (context.mounted) {
                             Navigator.pop(context);
                             if (ok) {
                               _showUndoSnackBar(delivery.deliveryId, 'Order cancelled');
@@ -390,7 +390,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -416,9 +416,9 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
               ElevatedButton(
                 onPressed: () async {
                   final ok = await ref.read(deliveryProvider.notifier).changeQuantity(delivery.deliveryId, qty);
-                  if (mounted) {
+                  if (context.mounted) {
                     Navigator.pop(context);
-                    if (ok) {
+                    if (ok && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Quantity updated to $qty Cans')),
                       );
@@ -481,9 +481,9 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                         amount: amt,
                         paymentMode: selectedMode,
                       );
-                  if (mounted) {
+                  if (context.mounted) {
                     Navigator.pop(context);
-                    if (ok) {
+                    if (ok && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Payment of ${AppFormatters.formatCurrency(amt)} recorded via $selectedMode')),
                       );
@@ -677,7 +677,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: (delivery.deliverySlot == 'Morning' ? Colors.amber : Colors.indigo).withOpacity(0.12),
+                                              color: (delivery.deliverySlot == 'Morning' ? Colors.amber : Colors.indigo).withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Row(
@@ -706,7 +706,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: _getStatusColor(delivery.deliveryStatus).withOpacity(0.12),
+                                        color: _getStatusColor(delivery.deliveryStatus).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -740,7 +740,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primary.withOpacity(0.1),
+                                            color: AppColors.primary.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Text(
@@ -825,7 +825,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                           onPressed: () async {
                                             final nextSlot = delivery.deliverySlot == 'Morning' ? 'Evening' : 'Morning';
                                             final ok = await ref.read(deliveryProvider.notifier).shiftSlot(delivery.deliveryId, nextSlot);
-                                            if (ok && mounted) {
+                                            if (ok && context.mounted) {
                                               ScaffoldMessenger.of(context).showSnackBar(
                                                 SnackBar(content: Text('Shifted delivery to $nextSlot slot')),
                                               );
@@ -850,7 +850,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                                                   updatedBy: userDisplayName,
                                                   updatedRole: 'Delivery Staff',
                                                 );
-                                            if (ok && mounted) {
+                                            if (ok && context.mounted) {
                                               _showUndoSnackBar(delivery.deliveryId, 'Delivery skipped today');
                                             }
                                           },
@@ -908,9 +908,9 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.2 : 0.1),
+        color: color.withValues(alpha: isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

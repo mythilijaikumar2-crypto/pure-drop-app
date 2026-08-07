@@ -428,11 +428,31 @@ class AppRepository implements IDeliveryRepository {
         previousStateJson: previousJson,
       );
 
-      // 1. Update Hive local storage
+      // 1. Update Hive delivery storage
       final box = HiveService.getBox(AppConstants.deliveryBoxName);
       await box.put(delivery.deliveryId, jsonEncode(updatedDelivery.toJson()));
 
       if (newStatus == 'delivered') {
+        final isPaid = paymentMode == 'Cash' || paymentMode == 'UPI';
+        final payMode = paymentMode == 'UPI' ? PaymentMode.upi : PaymentMode.cash;
+
+        // 2. Update Order in orderBox
+        final orderBox = HiveService.getBox(AppConstants.orderBoxName);
+        final orderStr = orderBox.get(delivery.orderId);
+        if (orderStr != null) {
+          final order = OrderModel.fromJson(jsonDecode(orderStr));
+          final updatedOrder = order.copyWith(
+            status: OrderStatus.delivered,
+            emptyCansCollected: emptyCansCollected > 0 ? emptyCansCollected : delivery.quantity,
+            damagedCansReported: damagedCansReported,
+            paymentStatus: isPaid ? PaymentStatus.paid : PaymentStatus.pending,
+            paymentMode: payMode,
+            updatedAt: now,
+          );
+          await orderBox.put(order.id, jsonEncode(updatedOrder.toJson()));
+        }
+
+        // 3. Update Warehouse Inventory
         final inventory = getInventory();
         final newFilled = (inventory.filledCans - delivery.quantity).clamp(0, 99999);
         final newEmpty = (inventory.emptyCans + emptyCansCollected).clamp(0, 99999);
@@ -443,18 +463,19 @@ class AppRepository implements IDeliveryRepository {
           filledCans: newFilled,
           emptyCans: newEmpty,
           damagedCans: newDamaged,
-          customerBalanceCans: newCustomerBalance,
+          customerBalanceCans: newCustomerBalance.clamp(0, 99999),
           lastUpdated: now,
         );
         await saveInventory(updatedInventory);
 
+        // 4. Update Customer Bottle Balance & Pending Dues
         final customerBox = HiveService.getBox(AppConstants.customerBoxName);
         final custStr = customerBox.get(delivery.customerId);
         if (custStr != null) {
           final cust = CustomerModel.fromJson(jsonDecode(custStr));
           final newCustBalance = (cust.canBalance + delivery.quantity - emptyCansCollected).clamp(0, 9999);
           final newEmptyPending = (cust.emptyCansPending + delivery.quantity - emptyCansCollected).clamp(0, 9999);
-          final newDues = cust.pendingDues + delivery.totalAmount;
+          final newDues = isPaid ? cust.pendingDues : cust.pendingDues + delivery.totalAmount;
 
           final updatedCust = cust.copyWith(
             canBalance: newCustBalance,
@@ -462,6 +483,35 @@ class AppRepository implements IDeliveryRepository {
             pendingDues: newDues,
           );
           await customerBox.put(cust.id, jsonEncode(updatedCust.toJson()));
+        }
+
+        // 5. Update Driver Active Workload
+        if (delivery.employeeId.isNotEmpty) {
+          final empBox = HiveService.getBox(AppConstants.employeeBoxName);
+          final empStr = empBox.get(delivery.employeeId);
+          if (empStr != null) {
+            final emp = EmployeeModel.fromJson(jsonDecode(empStr));
+            if (emp.activeOrderCount > 0) {
+              await empBox.put(emp.id, jsonEncode(emp.copyWith(
+                activeOrderCount: (emp.activeOrderCount - 1).clamp(0, 9999),
+              ).toJson()));
+            }
+          }
+        }
+
+        // 6. Record Payment transaction if paid on delivery
+        if (isPaid) {
+          final payment = PaymentModel(
+            id: 'PAY-${_uuid.v4().substring(0, 5).toUpperCase()}',
+            customerId: delivery.customerId,
+            customerName: delivery.customerName,
+            amount: delivery.totalAmount,
+            paymentMode: payMode,
+            referenceNo: 'REF-${delivery.orderId}',
+            date: now,
+            notes: 'Collected on delivery (${delivery.customerName})',
+          );
+          await recordPayment(payment);
         }
       } else if (newStatus == 'cancelled') {
         final orderBox = HiveService.getBox(AppConstants.orderBoxName);

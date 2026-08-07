@@ -2,9 +2,7 @@ import '../models/delivery_model.dart';
 
 /// Abstract Delivery Repository Interface.
 ///
-/// Ensures Clean Architecture decoupling. In offline mode, implemented by Hive
-/// (`AppRepository`). For future Firebase integration, replace only the
-/// repository implementation without modifying UI or Riverpod providers.
+/// Ensures Clean Architecture decoupling. Implemented by Hive (`AppRepository`).
 abstract class IDeliveryRepository {
   List<DeliveryModel> getDeliveries();
 

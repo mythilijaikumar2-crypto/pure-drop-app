@@ -1,6 +1,6 @@
 # Pure Drop Aqua 💧
 
-**Pure Drop Aqua** is an enterprise-grade Water Can Distribution Management System built with **Flutter**, **Riverpod**, **Hive NoSQL Database**, and **Google Firebase Cloud Services**.
+**Pure Drop Aqua** is an enterprise-grade Water Can Distribution Management System built with **Flutter**, **Riverpod**, and **Hive NoSQL Database**.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TD
 - **Login Credentials**:
   - **Admin Access**: User `admin` / Password `admin123` (Full system access across all modules).
   - **Delivery Staff Access**: User `driver` / Password `driver123` (Route-focused mobile view).
-- **Session Security**: Offline session persistence (`Remember Me`) backed by Hive NoSQL storage with Firebase Auth integration.
+- **Session Security**: Offline session persistence (`Remember Me`) backed by Hive NoSQL storage.
 
 ### 2. 👥 Customer Management & Security Deposit
 - **Profile Configuration**:

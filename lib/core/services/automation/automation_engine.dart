@@ -1,7 +1,6 @@
 import '../../../models/customer_model.dart';
 import '../../../models/employee_model.dart';
 import '../../../models/expense_model.dart';
-import '../../../models/water_purchase_model.dart';
 import '../../../repositories/interfaces/i_customer_repository.dart';
 import '../../../repositories/interfaces/i_order_repository.dart';
 import '../../../repositories/interfaces/i_employee_repository.dart';
@@ -13,7 +12,6 @@ import 'order_automation.dart';
 import 'employee_automation.dart';
 import 'payment_automation.dart';
 import 'inventory_automation.dart';
-import 'dashboard_automation.dart';
 import 'report_automation.dart';
 import 'timeline_automation.dart';
 import 'notification_automation.dart';
@@ -52,7 +50,7 @@ class AutomationEngine {
 
   /// Run daily automatic operations on app launch or timer trigger
   Future<void> checkAndRunDailyAutomations() async {
-    final generatedCount = await orderAutomation.checkAndGenerateDailyOrders();
+    await orderAutomation.checkAndGenerateDailyOrders();
     final inventory = inventoryAutomation.getInventory();
     if (inventory.isLowStock) {
       await notificationAutomation.triggerLowStockAlert(inventory.filledCans);
@@ -139,7 +137,17 @@ class AutomationEngine {
       await customerRepo.saveCustomer(updatedCustomer);
     }
 
-    // 4. Record Payment if paid immediately on delivery
+    // 4. Update Driver Active Workload
+    if (order.assignedDriverId != null && order.assignedDriverId!.isNotEmpty) {
+      final driver = await employeeRepo.getEmployeeById(order.assignedDriverId!);
+      if (driver != null && driver.activeOrderCount > 0) {
+        await employeeRepo.saveEmployee(driver.copyWith(
+          activeOrderCount: (driver.activeOrderCount - 1).clamp(0, 9999),
+        ));
+      }
+    }
+
+    // 5. Record Payment if paid immediately on delivery
     if (isPaid) {
       await paymentAutomation.collectPayment(
         customerId: order.customerId,
@@ -148,9 +156,10 @@ class AutomationEngine {
         paymentMode: paymentMode,
         notes: 'Collected on delivery (Order #${order.id})',
       );
+      await notificationAutomation.triggerPaymentCollectedAlert(order.customerName, order.totalAmount);
     }
 
-    // 5. Log Timeline Audit Entry
+    // 6. Log Timeline Audit Entry
     await timelineAutomation.logEvent(
       title: 'Delivery Completed',
       description: 'Order #${order.id} delivered to ${order.customerName} (${order.quantity} cans)',
@@ -159,6 +168,66 @@ class AutomationEngine {
       performedBy: order.assignedDriverName ?? 'Delivery Boy',
     );
 
+    // 7. Check low stock notification trigger
+    final inventory = inventoryAutomation.getInventory();
+    if (inventory.isLowStock) {
+      await notificationAutomation.triggerLowStockAlert(inventory.filledCans);
+    }
+
+    return true;
+  }
+
+  /// Trigger: Standalone Empty Cans Returned
+  Future<bool> handleEmptyCansReturned({
+    required String customerId,
+    required int emptyCansCount,
+  }) async {
+    if (emptyCansCount <= 0) return false;
+    final customer = await customerRepo.getCustomerById(customerId);
+    if (customer == null) return false;
+
+    final newEmptyPending = (customer.emptyCansPending - emptyCansCount).clamp(0, 9999);
+    final newCanBalance = (customer.canBalance - emptyCansCount).clamp(0, 9999);
+    await customerRepo.saveCustomer(customer.copyWith(
+      emptyCansPending: newEmptyPending,
+      canBalance: newCanBalance,
+    ));
+
+    final currentInv = inventoryAutomation.getInventory();
+    await inventoryAutomation.saveInventory(currentInv.copyWith(
+      emptyCans: currentInv.emptyCans + emptyCansCount,
+      customerBalanceCans: (currentInv.customerBalanceCans - emptyCansCount).clamp(0, 99999),
+      lastUpdated: DateTime.now(),
+    ));
+
+    await timelineAutomation.logEvent(
+      title: 'Empty Cans Returned',
+      description: 'Collected $emptyCansCount empty cans from ${customer.name}',
+      category: 'Inventory',
+      recordId: customerId,
+    );
+    return true;
+  }
+
+  /// Trigger: Standalone Damaged Cans Reported
+  Future<bool> handleDamagedCansReported({
+    required String customerId,
+    required int damagedCansCount,
+    String remarks = '',
+  }) async {
+    if (damagedCansCount <= 0) return false;
+    final currentInv = inventoryAutomation.getInventory();
+    await inventoryAutomation.saveInventory(currentInv.copyWith(
+      damagedCans: currentInv.damagedCans + damagedCansCount,
+      lastUpdated: DateTime.now(),
+    ));
+
+    await timelineAutomation.logEvent(
+      title: 'Damaged Cans Reported',
+      description: 'Reported $damagedCansCount damaged cans ($remarks)',
+      category: 'Inventory',
+      recordId: customerId,
+    );
     return true;
   }
 
@@ -170,13 +239,17 @@ class AutomationEngine {
     required PaymentMode paymentMode,
     String referenceNumber = '',
   }) async {
-    return paymentAutomation.collectPayment(
+    final success = await paymentAutomation.collectPayment(
       customerId: customerId,
       customerName: customerName,
       amount: amount,
       paymentMode: paymentMode,
       referenceNumber: referenceNumber,
     );
+    if (success) {
+      await notificationAutomation.triggerPaymentCollectedAlert(customerName, amount);
+    }
+    return success;
   }
 
   /// Trigger: Admin adds expense

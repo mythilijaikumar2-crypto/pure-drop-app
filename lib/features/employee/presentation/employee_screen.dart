@@ -50,6 +50,8 @@ class _EmployeeScreenState extends ConsumerState<EmployeeScreen> {
     final formKey = GlobalKey<FormState>();
     bool isSaving = false;
 
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,

@@ -1,11 +1,11 @@
 import '../core/constants/app_enums.dart';
 
 class UserModel {
-  final String id; // Firebase Auth UID
+  final String id; // Auth UID
   final String employeeId; // e.g. PDAEMP-001 or PDAEMP-000
   final String name;
   final String username;
-  final String firebaseEmail; // Synthetic email used in Firebase Auth
+  final String email;
   final UserRole role;
   final String employeeType; // Delivery Staff / Admin
   final String phone;
@@ -16,11 +16,14 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  String get firebaseEmail => email;
+
   UserModel({
     required this.id,
     required this.employeeId,
     required this.name,
     required this.username,
+    String? email,
     String? firebaseEmail,
     required this.role,
     this.employeeType = 'Delivery Staff',
@@ -31,7 +34,7 @@ class UserModel {
     this.loginTimestamp,
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : firebaseEmail = firebaseEmail ?? '${username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\-]'), '')}@puredropaqua.com',
+  })  : email = email ?? firebaseEmail ?? '${username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\-]'), '')}@puredropaqua.com',
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -41,7 +44,8 @@ class UserModel {
         'employeeId': employeeId,
         'name': name,
         'username': username,
-        'firebaseEmail': firebaseEmail,
+        'email': email,
+        'firebaseEmail': email,
         'role': role.name,
         'employeeType': employeeType,
         'phone': phone,

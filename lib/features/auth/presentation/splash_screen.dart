@@ -29,13 +29,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // 2. Seed initial business data if empty
       await ref.read(appRepositoryProvider).seedInitialDataIfEmpty();
 
-      // 3. One-time admin bootstrap — creates Firebase Auth account + Firestore
-      //    document for admin if this is the first app launch. Safe to call
-      //    on every launch (checks hasBootstrapped flag in Hive).
+      // 3. One-time admin bootstrap — creates admin session
+      //    if this is the first app launch.
       await ref.read(authServiceProvider).bootstrapAdminIfNeeded();
 
-      // 4. Check Firebase session — MUST be awaited before navigation
-      //    Firebase persists auth tokens automatically; this restores the session.
+      // 4. Check auth session — restores local Hive user session
       await ref.read(authProvider.notifier).checkSavedSession();
     } catch (e) {
       debugPrint('Splash initialization error: $e');

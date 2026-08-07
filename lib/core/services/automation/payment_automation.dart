@@ -1,4 +1,3 @@
-import '../../../models/customer_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../repositories/interfaces/i_customer_repository.dart';
 import '../../../repositories/interfaces/i_payment_repository.dart';

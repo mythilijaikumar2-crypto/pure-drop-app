@@ -41,7 +41,7 @@ class AuthService {
         'employeeId': 'PDAEMP-000',
         'name': 'Pure Drop Admin',
         'username': 'admin',
-        'firebaseEmail': 'admin@puredropaqua.com',
+        'email': 'admin@puredropaqua.com',
         'role': 'admin',
         'employeeType': 'Admin',
         'phone': '9876543210',
@@ -64,7 +64,7 @@ class AuthService {
         'employeeId': 'PDAEMP-001',
         'name': 'Ramesh Kumar',
         'username': 'driver1',
-        'firebaseEmail': 'driver1@puredropaqua.com',
+        'email': 'driver1@puredropaqua.com',
         'role': 'deliveryBoy',
         'employeeType': 'Delivery Staff',
         'phone': '9123456789',
@@ -108,7 +108,7 @@ class AuthService {
       ...profile,
       'id': uid,
       'uid': uid,
-      'firebaseEmail': syntheticEmail(identifier),
+      'email': syntheticEmail(identifier),
     };
 
     if (box != null) {

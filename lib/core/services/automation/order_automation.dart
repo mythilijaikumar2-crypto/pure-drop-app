@@ -1,5 +1,4 @@
 import '../../../models/customer_model.dart';
-import '../../../models/delivery_schedule_model.dart';
 import '../../../models/order_model.dart';
 import '../../../repositories/interfaces/i_customer_repository.dart';
 import '../../../repositories/interfaces/i_order_repository.dart';

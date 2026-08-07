@@ -39,7 +39,7 @@ class ExportService {
     final DateFormat formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
     buffer.writeln('PURE DROP AQUA - COMPLETE DATABASE EXPORT');
     buffer.writeln('Export Timestamp: ${formatter.format(DateTime.now())}');
-    buffer.writeln('Firebase Project ID: puredropaqua-369f6');
+    buffer.writeln('Database Engine: Hive Local Storage');
     buffer.writeln('----------------------------------------------------');
     buffer.writeln('');
 
